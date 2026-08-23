@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { playDeal, playDing, playShuffle, unlockAudio } from "@/lib/audio"
+import { armAudio, playDeal, playDing, playShuffle } from "@/lib/audio"
 import { cardsThisRound, trickWinner } from "@/lib/game/engine"
 import type { GameState, TrickPlay } from "@/lib/game/types"
 import { slotFor, type TableSlot } from "@/components/game/player-seat"
@@ -57,7 +57,7 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
   const prevPhase = useRef(state.phase)
   const flightId = useRef(0)
   const shownTrick = useRef<TrickPlay[]>(visibleTrick(state))
-  const lastCardKey = useRef<string | null>(null)
+  const seen = useRef(state)
   const lastTurn = useRef<string | null>(null)
   const [dealing, setDealing] = useState(false)
   const [shuffling, setShuffling] = useState(false)
@@ -71,10 +71,25 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
   const [trickWinnerSeat, setTrickWinnerSeat] = useState<number | null>(null)
 
   useEffect(() => {
-    const unlock = () => unlockAudio()
-    window.addEventListener("pointerdown", unlock, { once: true })
-    return () => window.removeEventListener("pointerdown", unlock)
+    armAudio()
   }, [])
+
+  useEffect(() => {
+    const before = seen.current
+    seen.current = state
+    if (before === state) return
+
+    const bidFromOther = state.bids.some(
+      (bid, seat) =>
+        bid !== null && before.bids[seat] === null && seat !== mySeat
+    )
+    if (bidFromOther) playDeal()
+
+    if (state.currentTrick.length > before.currentTrick.length) {
+      const play = state.currentTrick[state.currentTrick.length - 1]
+      if (play && play.seat !== mySeat) playDeal()
+    }
+  }, [mySeat, state])
 
   useEffect(() => {
     const from = prevPhase.current
@@ -175,14 +190,6 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
   const trickSig = `${live ? "live" : "done"}:${trickKey(plays)}:${state.phase}`
 
   useEffect(() => {
-    const newest = plays.length ? trickKey([plays[plays.length - 1]]) : ""
-    if (lastCardKey.current === null) {
-      lastCardKey.current = newest
-    } else if (newest && newest !== lastCardKey.current) {
-      playDeal()
-    }
-    lastCardKey.current = newest
-
     if (plays.length === 0) return
 
     const holding =

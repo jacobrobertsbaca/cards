@@ -17,7 +17,7 @@ import {
 import { displayGameTitle } from "@/lib/game/title"
 import { rememberGame } from "@/lib/history"
 import { gameTooltip } from "@/lib/game/rules"
-import { unlockAudio } from "@/lib/audio"
+import { playDeal, unlockAudio } from "@/lib/audio"
 import type { Card, GameState } from "@/lib/game/types"
 import { subscribeIdentity } from "@/lib/identity"
 import { GameTable } from "./table"
@@ -75,6 +75,7 @@ export function GameRoom({ code }: { code: string }) {
     if (mySeat == null) return
     try {
       await apply((current) => placeBid(current, mySeat.index, bid))
+      playDeal()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not bid")
     }
@@ -85,6 +86,7 @@ export function GameRoom({ code }: { code: string }) {
     if (mySeat == null) return
     try {
       await apply((current) => playCard(current, mySeat.index, card))
+      playDeal()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not play")
     }

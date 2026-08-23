@@ -65,7 +65,9 @@ export function PlayerSeat({
   const bid = state.bids[seat.index]
   const tricks = state.tricks[seat.index]
   const showFaces = self || spectating
-  const isTurn = state.phase === "playing" && state.currentSeat === seat.index
+  const isTurn =
+    (state.phase === "playing" || state.phase === "bidding") &&
+    state.currentSeat === seat.index
   const dealer = state.dealer === seat.index
   const sideways = slot === "west" || slot === "east"
 

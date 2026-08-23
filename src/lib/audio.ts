@@ -1,4 +1,6 @@
 let ctx: AudioContext | null = null
+let armed = false
+let lastDealAt = 0
 
 function context() {
   if (typeof window === "undefined") return null
@@ -11,6 +13,19 @@ export async function unlockAudio() {
   if (!audio) return null
   if (audio.state === "suspended") await audio.resume()
   return audio
+}
+
+export function armAudio() {
+  if (armed || typeof window === "undefined") return
+  armed = true
+  const resume = () => void unlockAudio()
+  for (const event of ["pointerdown", "pointerup", "keydown", "touchstart"]) {
+    window.addEventListener(event, resume, { capture: true })
+  }
+  window.addEventListener("focus", resume)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") resume()
+  })
 }
 
 function env(audio: AudioContext, start: number, attack: number, release: number) {
@@ -56,9 +71,12 @@ export function playShuffle() {
 }
 
 export function playDeal() {
+  const wall = typeof performance !== "undefined" ? performance.now() : Date.now()
+  if (wall - lastDealAt < 30) return
+  lastDealAt = wall
   void (async () => {
     const audio = await unlockAudio()
-    if (!audio) return
+    if (!audio || audio.state !== "running") return
     const now = audio.currentTime
     const osc = audio.createOscillator()
     const filter = audio.createBiquadFilter()

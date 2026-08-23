@@ -66,7 +66,7 @@ export function BidPanel({
 }) {
   const options = legalBids(state, seat)
   return (
-    <div className="pointer-events-auto absolute bottom-[11.5rem] left-1/2 z-20 flex -translate-x-1/2 flex-col items-center">
+    <div className="pointer-events-auto absolute bottom-[13.25rem] left-1/2 z-20 flex -translate-x-1/2 flex-col items-center">
       <div className="flex gap-1.5 rounded-full bg-black/25 p-1.5 backdrop-blur-sm">
         {Array.from({ length: cardsThisRound(state) + 1 }, (_, bid) => (
           <button

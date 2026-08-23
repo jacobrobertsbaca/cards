@@ -8,7 +8,8 @@ import { Segmented } from "@/components/segmented";
 import { PatternEditor } from "@/components/pattern-editor";
 import { ScoringFormulaEditor } from "@/components/scoring-formula";
 import { gameCode } from "@/lib/codes";
-import { createGame } from "@/lib/game/engine";
+import { createGame, joinGame } from "@/lib/game/engine";
+import { getIdentity } from "@/lib/identity";
 import { validatePattern, buildUpDown } from "@/lib/game/pattern";
 import { validateExpression } from "@/lib/game/formula";
 import { DEFAULT_FORMULA, type LeadTrump } from "@/lib/game/types";
@@ -19,7 +20,7 @@ import { gameTooltip } from "@/lib/game/rules";
 export function CreateGameForm() {
   const router = useRouter();
   const [kind] = useState("oh-hell");
-  const [seatCount, setSeatCount] = useState(4);
+  const [seatCount, setSeatCount] = useState(2);
   const [pattern, setPattern] = useState(buildUpDown(10));
   const [leadTrump, setLeadTrump] = useState<LeadTrump>("after-broken");
   const [hook, setHook] = useState(true);
@@ -46,7 +47,8 @@ export function CreateGameForm() {
         scoring,
       };
       const code = gameCode();
-      const state = createGame(settings);
+      const identity = getIdentity();
+      const state = joinGame(createGame(settings), identity.id, identity.name);
       await getGameStore().create({ code, kind: "oh-hell", state });
       rememberGame({
         code,
@@ -142,7 +144,7 @@ export function CreateGameForm() {
           onClick={() => void onCreate()}
           disabled={busy || Boolean(patternError || formulaError)}
         >
-          {busy ? "Opening…" : "Create table"}
+          {busy ? "Creating" : "Create game"}
         </Button>
       </div>
     </div>
