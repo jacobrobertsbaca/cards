@@ -224,7 +224,7 @@ function OwnHand({
             onMouseEnter={() => setHover(index)}
             style={{
               transform: `translateX(calc(-50% + ${pose.x + spread}px)) translateY(${pose.y - pose.depth + lift}px) rotate(${pose.rotate}deg)`,
-              zIndex: canPlay ? index + hand.length : index,
+              zIndex: index,
               isolation: "isolate",
             }}
           >
