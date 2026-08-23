@@ -22,6 +22,8 @@ Dropdown to select which game, after which more game-specific options appear. On
 
 Simulate a real oh-hell game. The basic UI should have our cards at the bottom, with others face-down cards around the edge of the screen (see [this screenshot](./screenshot.png) for a high-level example). Note that players can join and leave, and we always wait for the next player. There should be a button to join the game explicitly when visiting the page. Players are assigned to a "seat" as soon as they join for the first time, and should be uniquely IDed. Game state is always saved to the database to allow re-joining. You can also "spectate" a game, allowing you to view all player state. Game starts when every seat has been filled.
 
+Deck is a real deck that gets shuffled between each round. There should therefore never be any duplicate cards.
+
 ## Guidelines
 
 Create a very simple mockup of the behaviour I want. Keep code and UI very simple but elegant. We can refine as we go. Ask questions where behaviour is unclear.
