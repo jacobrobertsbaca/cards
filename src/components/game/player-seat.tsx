@@ -113,10 +113,10 @@ export function PlayerSeat({
         <span
           className={cn(
             "text-sm font-medium",
-            isTurn ? "name-turn" : "text-white/80"
+            isTurn ? "name-turn" : seat.displayName ? "text-white/80" : "text-white/50"
           )}
         >
-          {seat.displayName ?? "Empty"}
+          {seat.displayName ?? <WaitingName />}
         </span>
         {wonTrick && (
           <Crown
@@ -261,6 +261,15 @@ function SideHand({
     <div className="flex h-48 w-22 shrink-0 items-center justify-center">
       <div className={slot === "west" ? "-rotate-90" : "rotate-90"}>{children}</div>
     </div>
+  )
+}
+
+function WaitingName() {
+  return (
+    <>
+      Waiting for player
+      <span className="waiting-ellipsis" aria-hidden="true" />
+    </>
   )
 }
 

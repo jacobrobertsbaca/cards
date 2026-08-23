@@ -281,7 +281,7 @@ export function ranking(state: GameState) {
   return state.seats
     .map((seat, index) => ({
       seat: seat.index,
-      name: seat.displayName ?? `Seat ${seat.index + 1}`,
+      name: seat.displayName ?? `Player ${seat.index + 1}`,
       score: state.scores[index],
     }))
     .sort((a, b) => b.score - a.score)

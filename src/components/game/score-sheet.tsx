@@ -1,31 +1,31 @@
-"use client"
+"use client";
 
-import { ranking } from "@/lib/game/engine"
-import type { GameState } from "@/lib/game/types"
-import { cn } from "@/lib/utils"
+import { ranking } from "@/lib/game/engine";
+import type { GameState } from "@/lib/game/types";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
 
 function ScoreDelta({ value }: { value: number }) {
-  if (value === 0) return null
+  if (value === 0) return null;
   if (value > 0) {
-    return <span className="text-emerald-600"> +{value}</span>
+    return <span className="text-emerald-600"> +{value}</span>;
   }
-  return <> {value}</>
+  return <> {value}</>;
 }
 
 export function Scoreboard({ state }: { state: GameState }) {
-  const standings = ranking(state)
+  const standings = ranking(state);
 
   return (
     <Dialog>
@@ -47,11 +47,11 @@ export function Scoreboard({ state }: { state: GameState }) {
         <ScoreTable state={state} />
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function ScoreTable({ state }: { state: GameState }) {
-  const standings = ranking(state)
+  const standings = ranking(state);
 
   return (
     <div className="max-h-[min(24rem,70vh)] overflow-auto">
@@ -88,8 +88,8 @@ function ScoreTable({ state }: { state: GameState }) {
                   {round.cards}
                 </td>
                 {standings.map((row) => {
-                  const bid = round.bids[row.seat]
-                  const tricks = round.tricks[row.seat]
+                  const bid = round.bids[row.seat];
+                  const tricks = round.tricks[row.seat];
                   return (
                     <td key={row.seat} className="px-2 py-1.5 text-left">
                       <Tooltip>
@@ -100,10 +100,12 @@ function ScoreTable({ state }: { state: GameState }) {
                           {tricks}/{bid}
                           <ScoreDelta value={round.scores[row.seat]} />
                         </TooltipTrigger>
-                        <TooltipContent>{bidMadeLabel(bid, tricks)}</TooltipContent>
+                        <TooltipContent>
+                          {bidMadeLabel(bid, tricks)}
+                        </TooltipContent>
                       </Tooltip>
                     </td>
-                  )
+                  );
                 })}
               </tr>
             ))
@@ -134,10 +136,10 @@ function ScoreTable({ state }: { state: GameState }) {
         </tfoot>
       </table>
     </div>
-  )
+  );
 }
 
 function bidMadeLabel(bid: number, tricks: number) {
-  const made = tricks === 1 ? "1 trick" : `${tricks} tricks`
-  return `Bid ${bid}, made ${made}`
+  const made = tricks === 1 ? "1 trick" : `${tricks} tricks`;
+  return `Bid ${bid}, made ${made}`;
 }

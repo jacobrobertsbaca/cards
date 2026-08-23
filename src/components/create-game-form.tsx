@@ -65,14 +65,6 @@ export function CreateGameForm() {
 
   return (
     <div className="felt-ui mx-auto w-full max-w-lg space-y-8">
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">New table</p>
-        <h1 className="text-3xl font-medium tracking-tight">Oh Hell</h1>
-        <p className="text-sm leading-6 text-muted-foreground">
-          Bid exactly. Take exactly. Share a short link when you&apos;re ready.
-        </p>
-      </div>
-
       <section className="space-y-3">
         <Label>Game</Label>
         <Segmented

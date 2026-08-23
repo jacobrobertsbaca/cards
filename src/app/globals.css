@@ -121,8 +121,12 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
   body {
-    @apply bg-background text-foreground;
+    background-color: #16352b;
+  }
+  body {
+    @apply text-foreground;
   }
   html {
     @apply font-sans;
@@ -296,12 +300,61 @@
   animation: table-clear 500ms ease-in forwards;
 }
 
+@keyframes waiting-ellipsis {
+  0%,
+  20% {
+    content: "";
+  }
+  25%,
+  45% {
+    content: ".";
+  }
+  50%,
+  70% {
+    content: "..";
+  }
+  75%,
+  95% {
+    content: "...";
+  }
+}
+
+.waiting-ellipsis::after {
+  content: "";
+  animation: waiting-ellipsis 1.4s steps(1, end) infinite;
+}
+
+.felt,
+.felt * {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.22) transparent;
+}
+
+.felt *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.felt *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.felt *::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.22);
+  border-radius: 999px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .deck-shuffle,
   .deal-fly,
   .play-fly,
   .trick-out,
-  .table-clear {
+  .table-clear,
+  .waiting-ellipsis::after {
     animation: none;
+  }
+
+  .waiting-ellipsis::after {
+    content: "...";
   }
 }
