@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Check, Pencil, Plus } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { Check, Pencil, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -17,6 +17,7 @@ import { useHistory } from "@/hooks/use-history"
 import { useIdentity } from "@/hooks/use-identity"
 import { displayGameTitle } from "@/lib/game/title"
 import { historyTooltip } from "@/lib/game/rules"
+import { forgetGame } from "@/lib/history"
 import { setDisplayName } from "@/lib/identity"
 import { cn } from "@/lib/utils"
 
@@ -73,8 +74,14 @@ function SidebarBody({
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const games = useHistory()
   const identity = useIdentity()
+
+  function hideGame(code: string) {
+    if (pathname === `/${code}`) router.push("/")
+    forgetGame(code)
+  }
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden">
@@ -110,6 +117,7 @@ function SidebarBody({
                 title={historyTooltip(game.summary)}
                 expanded={expanded}
                 onNavigate={onNavigate}
+                onRemove={() => hideGame(game.code)}
               />
             )
           })}
@@ -131,6 +139,7 @@ function SidebarRow({
   title,
   expanded,
   onNavigate,
+  onRemove,
 }: {
   href: string
   active?: boolean
@@ -139,25 +148,34 @@ function SidebarRow({
   title?: string
   expanded: boolean
   onNavigate?: () => void
+  onRemove?: () => void
 }) {
   return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      title={expanded ? undefined : title}
-      className="flex h-9 w-full min-w-0 items-center overflow-hidden text-sm transition-colors hover:bg-white/5"
-    >
-      <span className="flex w-10 shrink-0 items-center justify-center">
-        <span
-          className={cn(TILE, active && "bg-white/15")}
-        >
-          {icon}
+    <div className="group/row flex h-9 w-full min-w-0 items-center overflow-hidden text-sm transition-colors hover:bg-white/5">
+      <Link
+        href={href}
+        onClick={onNavigate}
+        title={expanded ? undefined : title}
+        className="flex h-full min-w-0 flex-1 items-center overflow-hidden"
+      >
+        <span className="flex w-10 shrink-0 items-center justify-center">
+          <span className={cn(TILE, active && "bg-white/15")}>{icon}</span>
         </span>
-      </span>
-      {expanded && (
-        <span className="min-w-0 flex-1 truncate pr-4">{label}</span>
+        {expanded && (
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+        )}
+      </Link>
+      {expanded && onRemove && (
+        <button
+          type="button"
+          aria-label={`Remove ${label}`}
+          onClick={onRemove}
+          className="mr-1.5 flex size-6 shrink-0 items-center justify-center rounded-md text-white/45 opacity-70 transition-opacity hover:bg-white/10 hover:text-white md:opacity-0 md:group-hover/row:opacity-100"
+        >
+          <X className="size-3.5" />
+        </button>
       )}
-    </Link>
+    </div>
   )
 }
 

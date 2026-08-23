@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Check, Copy } from "lucide-react"
 import { isLegalPlay, trickWinner } from "@/lib/game/engine"
 import { rulesLine } from "@/lib/game/rules"
 import { displayGameTitle } from "@/lib/game/title"
@@ -147,11 +148,18 @@ function CopyLink({ code }: { code: string }) {
       <TooltipTrigger
         delay={200}
         onClick={() => void copy()}
-        className="pointer-events-auto mt-1 font-mono text-[11px] text-white/55 hover:text-white"
+        aria-label={copied ? "Copied" : "Copy game link"}
+        className="pointer-events-auto mt-1.5 flex size-6 items-center justify-center rounded-md text-white/55 hover:bg-white/10 hover:text-white"
       >
-        {copied ? "Copied" : `/${code}`}
+        {copied ? (
+          <Check className="size-3.5" />
+        ) : (
+          <Copy className="size-3.5" />
+        )}
       </TooltipTrigger>
-      <TooltipContent side="bottom">Copy game link</TooltipContent>
+      <TooltipContent side="bottom">
+        {copied ? "Copied" : "Copy game link"}
+      </TooltipContent>
     </Tooltip>
   )
 }
