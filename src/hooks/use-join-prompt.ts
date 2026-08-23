@@ -56,6 +56,8 @@ export function useJoinPrompt({
         : undefined,
     })
 
-    return () => toast.dismiss(TOAST_ID)
+    return () => {
+      toast.dismiss(TOAST_ID)
+    }
   }, [active, open, seats, taken])
 }
