@@ -13,11 +13,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import type { TableMotion } from "@/hooks/use-table-motion"
-import { PlayingCard } from "./playing-card"
 import { PlayerSeat, slotFor } from "./player-seat"
 import { Scoreboard } from "./score-sheet"
 import { DealOverlay } from "./deal-overlay"
 import { TrickPile } from "./trick-pile"
+import { TrumpSpot } from "./trump-reveal"
 
 export function GameTable({
   code,
@@ -27,7 +27,6 @@ export function GameTable({
   onlineIds,
   motion,
   onPlay,
-  onAdvanceTrick,
   onRename,
 }: {
   code: string
@@ -37,41 +36,40 @@ export function GameTable({
   onlineIds: string[]
   motion: TableMotion
   onPlay: (card: Card) => void
-  onAdvanceTrick?: () => void
   onRename: (title: string) => void
 }) {
   const anchor = mySeat ?? 0
   const count = state.settings.seatCount
   const clearing = state.phase === "game-over"
+  const waiting =
+    (state.phase === "trick-end" && !motion.trickLeaving) ||
+    state.phase === "round-end"
   const trickWinnerSeat =
     state.phase === "trick-end" && state.lastTrick.length > 0
       ? trickWinner(state.lastTrick, state.trump)
       : null
 
   return (
-    <div className="felt relative h-svh w-full overflow-hidden">
-      <header className="absolute top-3 left-12 right-4 z-20 flex items-start justify-between gap-4 text-white/80 md:left-4">
-        <div>
+    <div
+      className={cn(
+        "felt relative h-full min-h-0 w-full overflow-hidden overscroll-none",
+        waiting && "cursor-pointer"
+      )}
+    >
+      <header className="pointer-events-none absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] left-[max(3.25rem,env(safe-area-inset-left))] z-20 flex items-start justify-between gap-4 text-white/80 md:left-4">
+        <div className="hidden min-w-0 md:block">
           <TitleEditor title={displayGameTitle(state.title)} onRename={onRename} />
           <p className="max-w-md text-xs text-white/55">{rulesLine(state.settings)}</p>
-          <CopyLink code={code} />
         </div>
+        <CopyLink code={code} />
       </header>
 
-      {state.trump && motion.trumpReady && (
-        <div
-          className={cn(
-            "pointer-events-none absolute bottom-3 left-3 z-20 flex flex-col items-center",
-            clearing && "table-clear"
-          )}
-        >
-          <div className="rounded-lg shadow-[0_0_14px_rgb(251_191_36/0.14)] ring-2 ring-amber-200/70 ring-offset-2 ring-offset-[#16352b]">
-            <PlayingCard card={state.trump} size="md" />
-          </div>
-          <p className="mt-1.5 text-[10px] font-medium tracking-[0.22em] text-amber-100/80 uppercase">
-            Trump
-          </p>
-        </div>
+      {state.trump && motion.trumpPhase !== "hidden" && (
+        <TrumpSpot
+          card={state.trump}
+          phase={motion.trumpPhase}
+          clearing={clearing}
+        />
       )}
 
       <TrickPile
@@ -84,11 +82,6 @@ export function GameTable({
         takenByUs={
           mySeat === null ||
           (motion.trickWinnerSeat ?? trickWinnerSeat) === mySeat
-        }
-        onContinue={
-          state.phase === "trick-end" && !motion.trickLeaving
-            ? onAdvanceTrick
-            : undefined
         }
       />
 
@@ -122,11 +115,7 @@ export function GameTable({
         )
       })}
 
-      <DealOverlay
-        shuffling={motion.shuffling}
-        flights={motion.flights}
-        trump={state.trump}
-      />
+      <DealOverlay shuffling={motion.shuffling} flights={motion.flights} />
       <Scoreboard state={state} />
     </div>
   )
@@ -149,7 +138,7 @@ function CopyLink({ code }: { code: string }) {
         delay={200}
         onClick={() => void copy()}
         aria-label={copied ? "Copied" : "Copy game link"}
-        className="pointer-events-auto mt-1.5 flex size-6 items-center justify-center rounded-md text-white/55 hover:bg-white/10 hover:text-white"
+        className="pointer-events-auto ml-auto flex size-9 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white md:size-6 md:text-white/55"
       >
         {copied ? (
           <Check className="size-3.5" />

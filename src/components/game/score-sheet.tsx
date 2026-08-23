@@ -1,5 +1,6 @@
 "use client";
 
+import { ClipboardList } from "lucide-react";
 import { ranking } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
@@ -31,18 +32,23 @@ export function Scoreboard({ state }: { state: GameState }) {
     <Dialog>
       <DialogTrigger
         aria-label="Score sheet"
-        className="pointer-events-auto absolute right-4 bottom-4 z-20 cursor-pointer text-right text-xs text-white/70 outline-none hover:text-white focus-visible:text-white"
+        className="pointer-events-auto absolute right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 cursor-pointer text-white/70 outline-none hover:text-white focus-visible:text-white md:right-4 md:bottom-4"
       >
-        {standings.map((row) => (
-          <div key={row.seat} className="flex justify-end gap-3">
-            <span>{row.name}</span>
-            <span className="w-6 font-mono">{row.score}</span>
-          </div>
-        ))}
+        <span className="hidden text-right text-xs md:block">
+          {standings.map((row) => (
+            <div key={row.seat} className="flex justify-end gap-3">
+              <span>{row.name}</span>
+              <span className="w-6 tabular-nums">{row.score}</span>
+            </div>
+          ))}
+        </span>
+        <span className="flex size-9 items-center justify-center rounded-md hover:bg-white/10 md:hidden">
+          <ClipboardList className="size-4" />
+        </span>
       </DialogTrigger>
       <DialogContent className="bg-[#f7f4ee] text-[#2c261e] sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Scores</DialogTitle>
+          <DialogTitle className="font-sans">Scores</DialogTitle>
         </DialogHeader>
         <ScoreTable state={state} />
       </DialogContent>
@@ -55,10 +61,10 @@ function ScoreTable({ state }: { state: GameState }) {
 
   return (
     <div className="max-h-[min(24rem,70vh)] overflow-auto">
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full border-collapse font-sans text-sm">
         <thead>
           <tr>
-            <th className="sticky top-0 bg-[#f7f4ee] pr-3 pb-2 text-left text-xs font-normal text-[#6f675e]">
+            <th className="sticky top-0 bg-[#f7f4ee] pr-3 pb-2 text-left text-sm font-medium text-[#6f675e]">
               Tricks
             </th>
             {standings.map((row) => (
@@ -84,7 +90,7 @@ function ScoreTable({ state }: { state: GameState }) {
           ) : (
             state.history.map((round, index) => (
               <tr key={index}>
-                <td className="py-1.5 pr-3 text-left font-mono text-xs text-[#6f675e]">
+                <td className="py-1.5 pr-3 text-left text-sm tabular-nums text-[#6f675e]">
                   {round.cards}
                 </td>
                 {standings.map((row) => {
@@ -95,7 +101,7 @@ function ScoreTable({ state }: { state: GameState }) {
                       <Tooltip>
                         <TooltipTrigger
                           delay={200}
-                          className="font-mono tabular-nums"
+                          className="tabular-nums"
                         >
                           {tricks}/{bid}
                           <ScoreDelta value={round.scores[row.seat]} />
@@ -125,7 +131,7 @@ function ScoreTable({ state }: { state: GameState }) {
               <td
                 key={row.seat}
                 className={cn(
-                  "sticky bottom-0 bg-[#f7f4ee] px-2 pt-2 text-left font-mono font-medium tabular-nums",
+                  "sticky bottom-0 bg-[#f7f4ee] px-2 pt-2 text-left font-medium tabular-nums",
                   state.history.length > 0 && "border-t border-[#2c261e]/10"
                 )}
               >
@@ -140,6 +146,6 @@ function ScoreTable({ state }: { state: GameState }) {
 }
 
 function bidMadeLabel(bid: number, tricks: number) {
-  const made = tricks === 1 ? "1 trick" : `${tricks} tricks`;
-  return `Bid ${bid}, made ${made}`;
+  const bidWord = bid === 1 ? "trick" : "tricks";
+  return `Made ${tricks}, bid ${bid} ${bidWord}`;
 }

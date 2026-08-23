@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { useGame } from "@/hooks/use-game"
+import { useContinuePrompt } from "@/hooks/use-continue-prompt"
+import { useJoinPrompt } from "@/hooks/use-join-prompt"
+import { useRoundEndPrompt } from "@/hooks/use-round-end-prompt"
 import { useTableMotion } from "@/hooks/use-table-motion"
 import {
   GameError,
   continueTrick,
+  filledSeats,
   joinGame,
   placeBid,
   playCard,
@@ -24,8 +28,6 @@ import { GameTable } from "./table"
 import {
   BidPanel,
   GameOverOverlay,
-  JoinOverlay,
-  RoundEndOverlay,
 } from "./overlays"
 
 export function GameRoom({ code }: { code: string }) {
@@ -120,7 +122,7 @@ export function GameRoom({ code }: { code: string }) {
 
   if (status === "loading") {
     return (
-      <div className="flex h-svh items-center justify-center text-sm text-white/60">
+      <div className="flex h-full items-center justify-center text-sm text-white/60">
         Finding the table…
       </div>
     )
@@ -128,7 +130,7 @@ export function GameRoom({ code }: { code: string }) {
 
   if (status === "missing") {
     return (
-      <div className="flex h-svh flex-col items-center justify-center gap-2 text-white">
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-white">
         <p className="text-lg font-medium">No table here</p>
         <p className="text-sm text-white/60">That link does not match a game.</p>
       </div>
@@ -137,7 +139,7 @@ export function GameRoom({ code }: { code: string }) {
 
   if (status === "error" || !state) {
     return (
-      <div className="flex h-svh items-center justify-center text-sm text-red-200">
+      <div className="flex h-full items-center justify-center text-sm text-red-200">
         {error ?? "Something went wrong"}
       </div>
     )
@@ -199,11 +201,35 @@ function ReadyTable({
     state.phase === "bidding" &&
     state.currentSeat === mySeatIndex &&
     !motion.dealing
-  const showRoundEnd = state.phase === "round-end"
+  const showRoundEnd = state.phase === "round-end" && role !== "unknown"
   const showGameOver = state.phase === "game-over"
+  const lastRound = state.history[state.history.length - 1]
+  const waitingToContinue =
+    role !== "unknown" &&
+    state.phase === "trick-end" &&
+    !motion.trickLeaving
+
+  useContinuePrompt(waitingToContinue, onAdvanceTrick)
+  useJoinPrompt({
+    active: showJoin,
+    taken: filledSeats(state),
+    seats: state.settings.seatCount,
+    open: filledSeats(state) < state.settings.seatCount,
+    onJoin,
+    onSpectate,
+  })
+  useRoundEndPrompt({
+    active: showRoundEnd,
+    rows: (lastRound ? state.seats : []).map((seat) => ({
+      seat: seat.index,
+      name: seat.displayName ?? `Player ${seat.index + 1}`,
+      score: lastRound?.scores[seat.index] ?? 0,
+    })),
+    onContinue,
+  })
 
   return (
-    <div className="relative">
+    <div className="relative h-full overflow-hidden">
       <GameTable
         code={code}
         state={state}
@@ -212,27 +238,15 @@ function ReadyTable({
         onlineIds={online}
         motion={motion}
         onPlay={onPlay}
-        onAdvanceTrick={onAdvanceTrick}
         onRename={onRename}
       />
       {myTurnToBid && mySeatIndex !== null && (
         <BidPanel state={state} seat={mySeatIndex} onBid={onBid} />
       )}
-      {showJoin && (
-        <JoinOverlay
-          state={state}
-          onJoin={onJoin}
-          onSpectate={onSpectate}
-          error={actionError}
-        />
-      )}
-      {showRoundEnd && role !== "unknown" && (
-        <RoundEndOverlay state={state} onContinue={onContinue} />
-      )}
       {showGameOver && role !== "unknown" && (
         <GameOverOverlay state={state} />
       )}
-      {actionError && !showJoin && (
+      {actionError && (
         <p className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/40 px-3 py-1 text-xs text-red-100">
           {actionError}
         </p>

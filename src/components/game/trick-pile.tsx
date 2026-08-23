@@ -23,7 +23,6 @@ export function TrickPile({
   seatCount,
   highlightWinner,
   takenByUs,
-  onContinue,
 }: {
   plays: TrickPlay[]
   leaving: boolean
@@ -32,7 +31,6 @@ export function TrickPile({
   seatCount: number
   highlightWinner?: boolean
   takenByUs?: boolean
-  onContinue?: () => void
 }) {
   if (plays.length === 0) return null
   const winnerSlot =
@@ -42,12 +40,7 @@ export function TrickPile({
   const exit = winnerSlot ? exitOffset(winnerSlot) : { x: "0vw", y: "20vh" }
 
   return (
-    <div
-      className={cn(
-        "group/pile absolute top-1/2 left-1/2 z-20 flex h-36 w-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center",
-        onContinue && "pointer-events-auto"
-      )}
-    >
+    <div className="absolute top-1/2 left-1/2 z-20 flex h-36 w-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center">
       {plays.map((play, index) => {
         const stack = STACK[index] ?? STACK[0]
         const fromSlot = slotFor(
@@ -89,17 +82,6 @@ export function TrickPile({
           </div>
         )
       })}
-      {onContinue && !leaving && (
-        <button
-          type="button"
-          onClick={onContinue}
-          className="absolute inset-0 z-40 flex items-center justify-center focus-visible:[&>span]:opacity-100"
-        >
-          <span className="rounded-full bg-black px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap text-white opacity-0 shadow-[0_2px_8px_rgb(0_0_0/0.4)] transition-opacity duration-150 group-hover/pile:opacity-100">
-            Tap to continue
-          </span>
-        </button>
-      )}
     </div>
   )
 }

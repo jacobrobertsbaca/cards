@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { FAN_CARD, fanPose } from "./fan"
 
 const SIZES = {
+  xs: "w-10 h-[3.7rem] text-[10px] rounded-md",
   sm: "w-9 h-[3.15rem] text-[10px] rounded-md",
   md: "w-14 h-[5.15rem] text-xs rounded-lg",
   lg: "w-[5.35rem] h-[7.5rem] text-sm rounded-xl",
@@ -38,13 +39,14 @@ export function PlayingCard({
       onClick={onClick}
       disabled={onClick ? disabled : undefined}
       className={cn(
-        "relative isolate shrink-0 border shadow-md transition-transform duration-200 disabled:opacity-100",
+        "relative isolate shrink-0 border shadow-md transition-transform duration-200 outline-none disabled:opacity-100",
         SIZES[size],
         faceDown
           ? "border-[#1b2a4a] bg-[#243868] card-back"
           : "border-black/5 bg-[#fbfaf6]",
-        onClick && !disabled && "hover:-translate-y-2 hover:shadow-lg",
-        selected && "-translate-y-3 ring-2 ring-white/80",
+        onClick && !disabled && "[@media(hover:hover)]:hover:-translate-y-2 [@media(hover:hover)]:hover:shadow-lg",
+        selected &&
+          "border-transparent ring-[3px] ring-amber-300 [@media(hover:hover)]:ring-2 [@media(hover:hover)]:ring-white/80",
         disabled && "brightness-[0.55] saturate-50",
         className
       )}

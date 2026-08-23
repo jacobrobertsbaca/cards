@@ -1,59 +1,10 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import {
-  cardsThisRound,
-  filledSeats,
-  legalBids,
-  ranking,
-} from "@/lib/game/engine"
-import { rulesLine } from "@/lib/game/rules"
-import { displayGameTitle } from "@/lib/game/title"
+import { useState } from "react"
+import { Check } from "lucide-react"
+import { cardsThisRound, legalBids, ranking } from "@/lib/game/engine"
 import type { GameState } from "@/lib/game/types"
 import { cn } from "@/lib/utils"
-
-export function JoinOverlay({
-  state,
-  onJoin,
-  onSpectate,
-  busy,
-  error,
-}: {
-  state: GameState
-  onJoin: () => void
-  onSpectate: () => void
-  busy?: boolean
-  error?: string | null
-}) {
-  const taken = filledSeats(state)
-  const open = taken < state.settings.seatCount
-  return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/35 px-6 backdrop-blur-[2px]">
-      <div className="w-full max-w-sm space-y-4 rounded-2xl bg-[#f7f4ee] p-6 text-center text-[#2c261e] shadow-xl">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-medium tracking-tight">
-            {displayGameTitle(state.title)}
-          </h1>
-          <p className="text-sm text-[#6f675e]">{rulesLine(state.settings)}</p>
-        </div>
-        <p className="text-sm text-[#6f675e]">
-          {taken}/{state.settings.seatCount} joined
-        </p>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="flex justify-center gap-2">
-          {open && (
-            <Button size="lg" onClick={onJoin} disabled={busy}>
-              Join
-            </Button>
-          )}
-          <Button size="lg" variant="outline" onClick={onSpectate}>
-            Spectate
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export function BidPanel({
   state,
@@ -65,55 +16,44 @@ export function BidPanel({
   onBid: (bid: number) => void
 }) {
   const options = legalBids(state, seat)
-  return (
-    <div className="pointer-events-auto absolute bottom-[13.25rem] left-1/2 z-20 flex -translate-x-1/2 flex-col items-center">
-      <div className="flex gap-1.5 rounded-full bg-black/25 p-1.5 backdrop-blur-sm">
-        {Array.from({ length: cardsThisRound(state) + 1 }, (_, bid) => (
-          <button
-            key={bid}
-            type="button"
-            disabled={!options.includes(bid)}
-            onClick={() => onBid(bid)}
-            className={cn(
-              "size-9 rounded-full text-sm text-white transition-colors",
-              options.includes(bid)
-                ? "hover:bg-white/20"
-                : "cursor-not-allowed opacity-25"
-            )}
-          >
-            {bid}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
+  const [picked, setPicked] = useState<number | null>(null)
 
-export function RoundEndOverlay({
-  state,
-  onContinue,
-}: {
-  state: GameState
-  onContinue: () => void
-}) {
-  const last = state.history[state.history.length - 1]
   return (
-    <div className="absolute inset-0 z-30 flex items-end justify-center bg-gradient-to-t from-black/45 via-black/10 to-transparent px-6 pb-8 pt-[42vh]">
-      <div className="w-full max-w-sm space-y-4 rounded-2xl bg-[#f7f4ee] p-6 text-[#2c261e] shadow-xl">
-        <h2 className="text-lg font-medium">Round in</h2>
-        <div className="space-y-1.5 text-sm">
-          {state.seats.map((seat, index) => (
-            <div key={seat.index} className="flex justify-between">
-              <span>{seat.displayName}</span>
-              <span className="font-mono text-[#6f675e]">
-                {last?.tricks[index]}/{last?.bids[index]} · +{last?.scores[index]}
-              </span>
-            </div>
-          ))}
+    <div className="pointer-events-auto absolute inset-x-0 bottom-[calc(13.25rem+env(safe-area-inset-bottom,0px))] z-20 flex justify-center px-2 md:bottom-[15rem]">
+      <div className="flex w-full max-w-[min(24rem,calc(100vw-1rem))] items-center justify-center gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-0.5 rounded-full bg-black/25 p-1 backdrop-blur-sm md:flex-none md:gap-1.5 md:p-1.5">
+          {Array.from({ length: cardsThisRound(state) + 1 }, (_, bid) => {
+            const legal = options.includes(bid)
+            const selected = picked === bid
+            return (
+              <button
+                key={bid}
+                type="button"
+                disabled={!legal}
+                aria-pressed={selected}
+                onClick={() => setPicked(bid)}
+                className={cn(
+                  "aspect-square min-h-7 min-w-6 max-w-9 flex-1 touch-manipulation rounded-full text-xs transition-colors md:size-9 md:min-h-9 md:min-w-9 md:flex-none md:text-sm",
+                  !legal && "cursor-not-allowed text-white opacity-25",
+                  legal && !selected && "text-white hover:bg-white/20",
+                  selected && "bg-white text-[#16352b] shadow-sm"
+                )}
+              >
+                {bid}
+              </button>
+            )
+          })}
         </div>
-        <Button className="w-full" onClick={onContinue}>
-          Next round
-        </Button>
+        {picked !== null && (
+          <button
+            type="button"
+            aria-label={`Confirm bid ${picked}`}
+            onClick={() => onBid(picked)}
+            className="bid-check flex size-8 shrink-0 touch-manipulation items-center justify-center rounded-full bg-amber-200 text-[#16352b] shadow-[0_0_0_1px_rgb(251_191_36/0.45)] hover:bg-amber-100 md:size-9"
+          >
+            <Check className="size-3.5 md:size-4" strokeWidth={2.75} />
+          </button>
+        )}
       </div>
     </div>
   )

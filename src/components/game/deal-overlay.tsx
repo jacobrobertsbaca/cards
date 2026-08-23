@@ -3,18 +3,14 @@
 import type { CSSProperties } from "react"
 import type { DealFlight } from "@/hooks/use-table-motion"
 import { dealOffset } from "@/hooks/use-table-motion"
-import type { Card } from "@/lib/game/types"
-import { cn } from "@/lib/utils"
 import { PlayingCard } from "./playing-card"
 
 export function DealOverlay({
   shuffling,
   flights,
-  trump,
 }: {
   shuffling: boolean
   flights: DealFlight[]
-  trump: Card | null
 }) {
   return (
     <div className="pointer-events-none absolute inset-0 z-30">
@@ -40,21 +36,13 @@ export function DealOverlay({
         return (
           <div
             key={flight.id}
-            className={cn(
-              "deal-fly absolute top-1/2 left-1/2",
-              flight.slot === "trump" && "deal-fly-trump"
-            )}
+            className="deal-fly absolute top-1/2 left-1/2"
             style={{
               "--dx": offset.x,
               "--dy": offset.y,
             } as CSSProperties}
           >
-            <PlayingCard
-              card={flight.slot === "trump" ? trump ?? undefined : undefined}
-              faceDown={flight.slot !== "trump"}
-              size={flight.slot === "trump" ? "md" : "sm"}
-              className="transition-none"
-            />
+            <PlayingCard faceDown size="sm" className="transition-none" />
           </div>
         )
       })}

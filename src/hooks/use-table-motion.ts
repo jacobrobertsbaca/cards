@@ -8,20 +8,27 @@ import { slotFor, type TableSlot } from "@/components/game/player-seat"
 
 export type DealFlight = {
   id: number
-  slot: TableSlot | "trump"
+  slot: TableSlot
 }
 
-const SLOT_OFFSET: Record<TableSlot | "trump", { x: string; y: string }> = {
+export type TrumpPhase = "hidden" | "down" | "flip" | "fly" | "rest"
+
+const TRUMP_ENTER_MS = 160
+export const TRUMP_FLIP_MS = 380
+const TRUMP_SHOW_MS = 120
+const TRUMP_HOLD_MS = 70
+const TRUMP_FLY_MS = 520
+
+const SLOT_OFFSET: Record<TableSlot, { x: string; y: string }> = {
   south: { x: "0vw", y: "38vh" },
   north: { x: "0vw", y: "-36vh" },
   west: { x: "-36vw", y: "0vh" },
   east: { x: "36vw", y: "0vh" },
   "north-left": { x: "-22vw", y: "-30vh" },
   "north-right": { x: "22vw", y: "-30vh" },
-  trump: { x: "-40vw", y: "38vh" },
 }
 
-export function dealOffset(slot: TableSlot | "trump") {
+export function dealOffset(slot: TableSlot) {
   return SLOT_OFFSET[slot]
 }
 
@@ -65,7 +72,9 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     state.seats.map((_, index) => state.hands[index]?.length ?? 0)
   )
   const [flights, setFlights] = useState<DealFlight[]>([])
-  const [trumpReady, setTrumpReady] = useState(state.trump !== null)
+  const [trumpPhase, setTrumpPhase] = useState<TrumpPhase>(
+    state.trump ? "rest" : "hidden"
+  )
   const [trick, setTrick] = useState<TrickPlay[]>(visibleTrick(state))
   const [trickLeaving, setTrickLeaving] = useState(false)
   const [trickWinnerSeat, setTrickWinnerSeat] = useState<number | null>(null)
@@ -101,17 +110,17 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     const count = state.settings.seatCount
     const cards = cardsThisRound(state)
     const first = (state.dealer + 1) % count
-    const queue: Array<{ seat?: number; trump?: boolean }> = []
+    const queue: number[] = []
     for (let card = 0; card < cards; card++) {
       for (let step = 0; step < count; step++) {
-        queue.push({ seat: (first + step) % count })
+        queue.push((first + step) % count)
       }
     }
-    if (state.trump) queue.push({ trump: true })
+    const hasTrump = state.trump !== null
 
     const fullHands = state.hands.map((hand) => hand.length)
     setDealing(true)
-    setTrumpReady(false)
+    setTrumpPhase("hidden")
     setRevealed(state.seats.map(() => 0))
     const timers: number[] = []
     const later = (fn: () => void, ms: number) => {
@@ -134,13 +143,38 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     }
 
     const startAt = held ? 420 : 0
+    const finishDeal = (animateTrump: boolean) => {
+      setRevealed(fullHands)
+      setFlights([])
+      if (!hasTrump) {
+        setTrumpPhase("hidden")
+        setDealing(false)
+        return
+      }
+      if (!animateTrump) {
+        setTrumpPhase("rest")
+        setDealing(false)
+        return
+      }
+      setTrumpPhase("down")
+      later(() => {
+        setTrumpPhase("flip")
+        playDeal()
+      }, TRUMP_ENTER_MS + TRUMP_SHOW_MS)
+      later(() => {
+        setTrumpPhase("fly")
+        setDealing(false)
+      }, TRUMP_ENTER_MS + TRUMP_SHOW_MS + TRUMP_FLIP_MS + TRUMP_HOLD_MS)
+      later(
+        () => setTrumpPhase("rest"),
+        TRUMP_ENTER_MS + TRUMP_SHOW_MS + TRUMP_FLIP_MS + TRUMP_HOLD_MS + TRUMP_FLY_MS
+      )
+    }
 
     if (prefersReducedMotion()) {
       later(() => {
         playShuffle()
-        setRevealed(fullHands)
-        setTrumpReady(true)
-        setDealing(false)
+        finishDeal(false)
       }, startAt)
       return () => timers.forEach((timer) => window.clearTimeout(timer))
     }
@@ -155,32 +189,22 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     const stagger = Math.max(48, Math.min(90, budget / Math.max(queue.length, 1)))
     const flightMs = 240
 
-    queue.forEach((item, index) => {
+    queue.forEach((seat, index) => {
       later(() => {
-        const slot: TableSlot | "trump" = item.trump
-          ? "trump"
-          : slotFor(count, ((item.seat ?? 0) - (mySeat ?? 0) + count) % count)
+        const slot = slotFor(count, (seat - (mySeat ?? 0) + count) % count)
         const id = ++flightId.current
         setFlights((current) => [...current, { id, slot }])
         playDeal()
         later(() => {
           setFlights((current) => current.filter((flight) => flight.id !== id))
-          if (item.trump) setTrumpReady(true)
-          else if (item.seat !== undefined) {
-            setRevealed((current) =>
-              current.map((value, seat) => (seat === item.seat ? value + 1 : value))
-            )
-          }
+          setRevealed((current) =>
+            current.map((value, index) => (index === seat ? value + 1 : value))
+          )
         }, flightMs)
       }, startAt + 520 + index * stagger)
     })
 
-    later(() => {
-      setRevealed(fullHands)
-      setTrumpReady(true)
-      setDealing(false)
-      setFlights([])
-    }, startAt + 520 + queue.length * stagger + flightMs + 40)
+    later(() => finishDeal(true), startAt + 520 + queue.length * stagger + flightMs + 40)
 
     return () => timers.forEach((timer) => window.clearTimeout(timer))
   }, [mySeat, state.dealer, state.phase, state.roundIndex, state.settings.seatCount])
@@ -245,7 +269,7 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     shuffling,
     revealed,
     flights,
-    trumpReady,
+    trumpPhase,
     trick,
     trickLeaving,
     trickWinnerSeat,

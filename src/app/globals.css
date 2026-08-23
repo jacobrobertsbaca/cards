@@ -124,6 +124,7 @@
   html,
   body {
     background-color: #16352b;
+    height: 100%;
   }
   body {
     @apply text-foreground;
@@ -204,6 +205,25 @@
   animation: sit-in 200ms ease-out;
 }
 
+@keyframes bid-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) rotate(-18deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.12) rotate(6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.bid-check {
+  animation: bid-check-pop 320ms cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
 @keyframes deck-shuffle {
   0%,
   100% {
@@ -239,8 +259,94 @@
   animation: deal-fly 240ms cubic-bezier(0.22, 0.8, 0.28, 1) both;
 }
 
-.deal-fly-trump {
-  animation-duration: 320ms;
+.trump-move {
+  transform-origin: center center;
+}
+
+.trump-at-center,
+.trump-enter,
+.trump-fly {
+  will-change: transform;
+}
+
+.trump-at-center {
+  transform: translate3d(var(--dx), var(--dy), 0) scale(2.18);
+}
+
+@keyframes trump-enter {
+  from {
+    opacity: 0.4;
+    transform: translate3d(var(--dx), var(--dy), 0) scale(1.42);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(var(--dx), var(--dy), 0) scale(2.18);
+  }
+}
+
+.trump-enter {
+  animation: trump-enter 160ms cubic-bezier(0.22, 0.82, 0.28, 1) both;
+}
+
+@keyframes trump-spin {
+  0% {
+    transform: perspective(1100px) rotateY(0deg);
+  }
+  49% {
+    transform: perspective(1100px) rotateY(90deg);
+  }
+  51% {
+    transform: perspective(1100px) rotateY(-90deg);
+  }
+  100% {
+    transform: perspective(1100px) rotateY(0deg);
+  }
+}
+
+.trump-spin-run {
+  animation: trump-spin 380ms cubic-bezier(0.45, 0.05, 0.15, 1);
+  backface-visibility: hidden;
+}
+
+@keyframes trump-fly {
+  0% {
+    transform: translate3d(var(--dx), var(--dy), 0) scale(2.18);
+  }
+  20% {
+    transform: translate3d(
+      calc(var(--dx) * 0.864),
+      calc(var(--dy) * 0.666),
+      0
+    ) scale(1.94);
+  }
+  40% {
+    transform: translate3d(
+      calc(var(--dx) * 0.696),
+      calc(var(--dy) * 0.398),
+      0
+    ) scale(1.71);
+  }
+  60% {
+    transform: translate3d(
+      calc(var(--dx) * 0.496),
+      calc(var(--dy) * 0.198),
+      0
+    ) scale(1.47);
+  }
+  80% {
+    transform: translate3d(
+      calc(var(--dx) * 0.264),
+      calc(var(--dy) * 0.066),
+      0
+    ) scale(1.24);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.trump-fly {
+  animation: trump-fly 520ms cubic-bezier(0.33, 0.05, 0.2, 1) both;
 }
 
 @keyframes play-fly {
@@ -350,6 +456,9 @@
   .play-fly,
   .trick-out,
   .table-clear,
+  .trump-enter,
+  .trump-spin-run,
+  .trump-fly,
   .waiting-ellipsis::after {
     animation: none;
   }
