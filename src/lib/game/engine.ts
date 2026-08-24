@@ -1,6 +1,6 @@
 import { createDeck, sameCard, shuffle, sortHand, rankValue } from "./cards"
 import { evaluateFormula } from "./formula"
-import { randomName } from "../names"
+import { randomBotName } from "../names"
 import { validatePattern } from "./pattern"
 import { defaultGameTitle } from "./title"
 import type { Card, GameSettings, GameState, TrickPlay } from "./types"
@@ -85,7 +85,7 @@ export function makeBot(state: GameState, seatIndex: number): GameState {
   if (seat.playerId) throw new GameError("That seat is taken")
 
   seat.playerId = `bot:${seatIndex}`
-  seat.displayName = randomName()
+  seat.displayName = randomBotName()
   seat.isBot = true
   return next
 }
