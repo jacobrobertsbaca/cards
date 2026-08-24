@@ -215,8 +215,8 @@ function OwnHand({
   const arriving = useArrivingIndex(hand.length, dealing)
   const spec = confirmToPlay
     ? { ...FAN_CARD.lg, radius: 300, maxHalfAngle: 12 }
-    : FAN_CARD.xl
-  const gap = confirmToPlay ? 2.6 : 1.15
+    : { ...FAN_CARD.xl, maxHalfAngle: 18 }
+  const gap = confirmToPlay ? 2.6 : 1.6
   const cardSize = confirmToPlay ? "lg" : "xl"
   const sample = fanPose(hand.length, 0, spec.radius, spec.maxHalfAngle, gap)
   const width = Math.max(spec.w, 2 * Math.abs(sample.x) + spec.w)
