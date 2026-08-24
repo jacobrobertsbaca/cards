@@ -11,7 +11,7 @@ import { gameCode } from "@/lib/codes";
 import { createGame, joinGame } from "@/lib/game/engine";
 import { getIdentity } from "@/lib/identity";
 import { validatePattern, buildUpDown } from "@/lib/game/pattern";
-import { validateExpression } from "@/lib/game/formula";
+import { validateCondition, validateExpression } from "@/lib/game/formula";
 import { DEFAULT_FORMULA, type LeadTrump } from "@/lib/game/types";
 import { rememberGame } from "@/lib/history";
 import { getGameStore } from "@/lib/store";
@@ -30,7 +30,10 @@ export function CreateGameForm() {
 
   const patternError = validatePattern(pattern, seatCount);
   const formulaError = scoring.cases
-    .map((rule) => validateExpression(rule.expression))
+    .flatMap((rule) => [
+      validateExpression(rule.expression),
+      validateCondition(rule.condition),
+    ])
     .find(Boolean);
 
   async function onCreate() {
@@ -136,7 +139,12 @@ export function CreateGameForm() {
       </section>
 
       <section className="space-y-3">
-        <Label>Scoring</Label>
+        <div className="space-y-1">
+          <Label>Scoring</Label>
+          <p className="text-xs text-muted-foreground">
+            Click to edit. Cases are tried from top to bottom.
+          </p>
+        </div>
         <ScoringFormulaEditor value={scoring} onChange={setScoring} />
       </section>
 

@@ -71,10 +71,15 @@ export function joinGame(
   open.playerId = playerId
   open.displayName = displayName
 
-  if (next.seats.every((seat) => seat.playerId) && next.phase === "lobby") {
-    return startRound(next)
-  }
   return next
+}
+
+export function startGame(state: GameState): GameState {
+  if (state.phase !== "lobby") throw new GameError("The game has already started")
+  if (!state.seats.every((seat) => seat.playerId)) {
+    throw new GameError("Waiting for more players")
+  }
+  return startRound(state)
 }
 
 export function renameSeat(

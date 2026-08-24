@@ -284,7 +284,7 @@ function OwnHand({
                 if (node) cardNodes.current.set(key, node)
                 else cardNodes.current.delete(key)
               }}
-              className="absolute bottom-0 left-1/2 origin-bottom transition-transform duration-200 ease-out"
+              className="absolute bottom-0 left-1/2 origin-bottom transition-transform duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
               onMouseEnter={() => setHover(index)}
               style={{
                 transform: `translateX(calc(-50% + ${pose.x + spread}px)) translateY(${pose.y - pose.depth + lift}px) rotate(${pose.rotate}deg)`,

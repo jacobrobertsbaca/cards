@@ -5,6 +5,7 @@ import { useGame } from "@/hooks/use-game"
 import { useContinuePrompt } from "@/hooks/use-continue-prompt"
 import { useGameOverPrompt } from "@/hooks/use-game-over-prompt"
 import { useJoinPrompt } from "@/hooks/use-join-prompt"
+import { useLobbyReadyPrompt } from "@/hooks/use-lobby-ready-prompt"
 import { useRoundEndPrompt } from "@/hooks/use-round-end-prompt"
 import { useTableMotion } from "@/hooks/use-table-motion"
 import {
@@ -18,6 +19,7 @@ import {
   renameGame,
   renameSeat,
   seatForPlayer,
+  startGame,
   startRound,
 } from "@/lib/game/engine"
 import { displayGameTitle } from "@/lib/game/title"
@@ -133,6 +135,16 @@ export function GameRoom({ code }: { code: string }) {
     }
   }
 
+  async function onStart() {
+    unlockAudio()
+    try {
+      await apply((current) => startGame(current))
+      playDeal()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not start")
+    }
+  }
+
   async function onRename(title: string) {
     try {
       await apply((current) => renameGame(current, title))
@@ -176,6 +188,7 @@ export function GameRoom({ code }: { code: string }) {
       actionError={actionError}
       onJoin={() => void onJoin()}
       onSpectate={() => setSpectating(true)}
+      onStart={() => void onStart()}
       onBid={(bid) => void onBid(bid)}
       onPlay={onPlay}
       onAdvanceTrick={() => void onAdvanceTrick()}
@@ -194,6 +207,7 @@ function ReadyTable({
   actionError,
   onJoin,
   onSpectate,
+  onStart,
   onBid,
   onPlay,
   onAdvanceTrick,
@@ -208,6 +222,7 @@ function ReadyTable({
   actionError: string | null
   onJoin: () => void
   onSpectate: () => void
+  onStart: () => void
   onBid: (bid: number) => void
   onPlay: (card: Card) => void | Promise<void | boolean>
   onAdvanceTrick: () => void
@@ -217,6 +232,9 @@ function ReadyTable({
   const seated = mySeatIndex !== null
   const showJoin =
     role === "unknown" && !seated && state.phase !== "game-over"
+  const tableFull = filledSeats(state) >= state.settings.seatCount
+  const showLobbyReady =
+    state.phase === "lobby" && tableFull && role !== "unknown"
   const motion = useTableMotion(state, mySeatIndex)
   const myTurnToBid =
     seated &&
@@ -235,9 +253,13 @@ function ReadyTable({
     active: showJoin,
     taken: filledSeats(state),
     seats: state.settings.seatCount,
-    open: filledSeats(state) < state.settings.seatCount,
+    open: !tableFull,
     onJoin,
     onSpectate,
+  })
+  useLobbyReadyPrompt({
+    active: showLobbyReady,
+    onStart,
   })
   useRoundEndPrompt({
     active: showRoundEnd,

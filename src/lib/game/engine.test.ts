@@ -11,6 +11,7 @@ import {
   isLegalPlay,
   wouldBeLegalPlay,
   renameGame,
+  startGame,
 } from "./engine"
 import { evaluateFormula } from "./formula"
 import type { GameSettings } from "./types"
@@ -39,12 +40,14 @@ describe("scoring formula", () => {
 })
 
 describe("oh hell", () => {
-  it("starts when the last seat is filled", () => {
+  it("stays in lobby until the game is started", () => {
     let state = createGame(settings())
     state = joinGame(state, "a", "Ada")
     state = joinGame(state, "b", "Bea")
     assert.equal(state.phase, "lobby")
     state = joinGame(state, "c", "Cal")
+    assert.equal(state.phase, "lobby")
+    state = startGame(state)
     assert.equal(state.phase, "bidding")
     assert.equal(state.hands.every((hand) => hand.length === 1), true)
     assert.ok(state.trump)
@@ -55,6 +58,7 @@ describe("oh hell", () => {
     state = joinGame(state, "a", "Ada")
     state = joinGame(state, "b", "Bea")
     state = joinGame(state, "c", "Cal")
+    state = startGame(state)
     const first = state.currentSeat!
     state = placeBid(state, first, 1)
     const second = state.currentSeat!
@@ -68,6 +72,7 @@ describe("oh hell", () => {
     let state = createGame(settings({ seatCount: 2, pattern: [2], hook: false }))
     state = joinGame(state, "a", "Ada")
     state = joinGame(state, "b", "Bea")
+    state = startGame(state)
     state = placeBid(state, state.currentSeat!, 0)
     state = placeBid(state, state.currentSeat!, 1)
     const leader = state.currentSeat!
@@ -92,6 +97,7 @@ describe("oh hell", () => {
     let state = createGame(settings({ seatCount: 2, pattern: [1], hook: false }))
     state = joinGame(state, "a", "Ada")
     state = joinGame(state, "b", "Bea")
+    state = startGame(state)
     state = placeBid(state, state.currentSeat!, 0)
     state = placeBid(state, state.currentSeat!, 0)
     const leader = state.currentSeat!
@@ -118,6 +124,7 @@ describe("oh hell", () => {
     let state = createGame(settings({ seatCount: 2, pattern: [2], hook: false }))
     state = joinGame(state, "a", "Ada")
     state = joinGame(state, "b", "Bea")
+    state = startGame(state)
     state = placeBid(state, state.currentSeat!, 0)
     state = placeBid(state, state.currentSeat!, 1)
     const leadSeat = state.currentSeat!

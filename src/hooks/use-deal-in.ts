@@ -42,12 +42,18 @@ export function useDealIn(active: boolean) {
 
     const anim = el.animate(
       [
-        { transform: `translate3d(${x}px, ${y}px, 0) scale(0.72)` },
-        { transform: "translate3d(0, 0, 0) scale(1)" },
+        {
+          transform: `translate3d(${x}px, ${y}px, 0) scale(0.84)`,
+          opacity: 0.55,
+        },
+        {
+          transform: "translate3d(0, 0, 0) scale(1)",
+          opacity: 1,
+        },
       ],
       {
-        duration: 240,
-        easing: "cubic-bezier(0.22, 0.8, 0.28, 1)",
+        duration: 380,
+        easing: "cubic-bezier(0.16, 1, 0.3, 1)",
         fill: "both",
       }
     )

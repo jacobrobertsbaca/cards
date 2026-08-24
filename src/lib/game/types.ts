@@ -25,11 +25,9 @@ export type Card = {
 
 export type LeadTrump = "always" | "after-broken"
 
-export type FormulaCondition = "eq" | "neq" | "gt" | "lt" | "always"
-
 export type FormulaCase = {
   id: string
-  condition: FormulaCondition
+  condition: string
   expression: string
 }
 
@@ -95,8 +93,8 @@ export type GameState = {
 
 export const DEFAULT_FORMULA: ScoringFormula = {
   cases: [
-    { id: "make", condition: "eq", expression: "10 + t" },
-    { id: "miss", condition: "always", expression: "t" },
+    { id: "make", condition: "b = t", expression: "10 + t" },
+    { id: "miss", condition: "otherwise", expression: "t" },
   ],
 }
 

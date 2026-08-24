@@ -177,12 +177,12 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     }, startAt)
     later(() => setShuffling(false), startAt + 520)
 
-    const budget = 2200
-    const flightMs = 240
+    const budget = 2800
+    const flightMs = 380
     const minStagger = Math.ceil(flightMs / Math.max(count, 1))
     const stagger = Math.max(
       minStagger,
-      Math.min(90, budget / Math.max(queue.length, 1))
+      Math.min(100, budget / Math.max(queue.length, 1))
     )
 
     queue.forEach((seat, index) => {
@@ -194,7 +194,7 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
       }, startAt + 520 + index * stagger)
     })
 
-    later(() => finishDeal(true), startAt + 520 + queue.length * stagger + flightMs + 40)
+    later(() => finishDeal(true), startAt + 520 + queue.length * stagger + flightMs + 60)
 
     return () => timers.forEach((timer) => window.clearTimeout(timer))
   }, [mySeat, state.dealer, state.phase, state.roundIndex, state.settings.seatCount])
