@@ -1,6 +1,5 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import { chooseBid, choosePlay, shouldRunBotController } from "./bot"
 import {
   createGame,
   joinGame,
@@ -10,8 +9,9 @@ import {
   removeBot,
   startGame,
   wouldBeLegalPlay,
-} from "./engine"
-import type { GameSettings } from "./types"
+} from "../engine"
+import type { GameSettings } from "../types"
+import { chooseBid, choosePlay, shouldRunBotController } from "./index"
 
 const settings: GameSettings = {
   kind: "oh-hell",

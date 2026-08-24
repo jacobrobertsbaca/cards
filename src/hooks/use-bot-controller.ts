@@ -6,7 +6,7 @@ import {
   choosePlay,
   isBotSeat,
   shouldRunBotController,
-} from "@/lib/game/bot"
+} from "@/lib/game/bots"
 import {
   placeBid,
   playCard,

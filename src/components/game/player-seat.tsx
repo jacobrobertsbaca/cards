@@ -1,28 +1,27 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react"
-import { AnimatePresence, motion } from "motion/react"
-import { Bot, BotOff, Check, Crown, Ellipsis, Shuffle } from "lucide-react"
-import { isLegalPlay } from "@/lib/game/engine"
-import type { Card, GameState, Seat } from "@/lib/game/types"
-import { cn } from "@/lib/utils"
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Bot, BotOff, Check, Crown, Ellipsis, Shuffle } from "lucide-react";
+import { isLegalPlay } from "@/lib/game/engine";
+import type { Card, GameState, Seat } from "@/lib/game/types";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useCoarsePointer } from "@/hooks/use-coarse-pointer"
-import { useArrivingIndex } from "@/hooks/use-deal-in"
+} from "@/components/ui/dropdown-menu";
+import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
+import { useArrivingIndex } from "@/hooks/use-deal-in";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { FAN_CARD, fanPose } from "./fan"
-import { PopConfirmButton } from "./pop-confirm"
-import { originFromElement, usePlayOrigin } from "./play-origin"
-import { CardFan, DealIn, PlayingCard } from "./playing-card"
+} from "@/components/ui/tooltip";
+import { FAN_CARD, fanPose } from "./fan";
+import { PopConfirmButton } from "./pop-confirm";
+import { originFromElement, usePlayOrigin } from "./play-origin";
+import { CardFan, DealIn, PlayingCard } from "./playing-card";
 
 export type TableSlot =
   | "south"
@@ -30,13 +29,16 @@ export type TableSlot =
   | "east"
   | "north"
   | "north-left"
-  | "north-right"
+  | "north-right";
 
 export function slotFor(count: number, relative: number): TableSlot {
-  if (count === 2) return (["south", "north"] as const)[relative]
-  if (count === 3) return (["south", "west", "east"] as const)[relative]
-  if (count === 4) return (["south", "west", "north", "east"] as const)[relative]
-  return (["south", "west", "north-left", "north-right", "east"] as const)[relative]
+  if (count === 2) return (["south", "north"] as const)[relative];
+  if (count === 3) return (["south", "west", "east"] as const)[relative];
+  if (count === 4)
+    return (["south", "west", "north", "east"] as const)[relative];
+  return (["south", "west", "north-left", "north-right", "east"] as const)[
+    relative
+  ];
 }
 
 const SLOT_CLASS: Record<TableSlot, string> = {
@@ -50,7 +52,7 @@ const SLOT_CLASS: Record<TableSlot, string> = {
     "top-[max(clamp(2.25rem,calc(2.25rem+max(0px,30rem-100vw)*0.08),3.5rem),env(safe-area-inset-top))] left-[min(22%,max(0.75rem,calc(50%-9rem)))] items-center",
   "north-right":
     "top-[max(clamp(2.25rem,calc(2.25rem+max(0px,30rem-100vw)*0.08),3.5rem),env(safe-area-inset-top))] right-[min(22%,max(0.75rem,calc(50%-9rem)))] items-center",
-}
+};
 
 export function PlayerSeat({
   seat,
@@ -68,32 +70,31 @@ export function PlayerSeat({
   onSwapSeats,
   onPlay,
 }: {
-  seat: Seat
-  state: GameState
-  slot: TableSlot
-  self: boolean
-  spectating: boolean
-  online: boolean
-  revealCount?: number
-  dealing?: boolean
-  wonTrick?: boolean
-  canManageBots?: boolean
-  onMakeBot?: (seatIndex: number) => void
-  onRemoveBot?: (seatIndex: number) => void
-  onSwapSeats?: (seatIndex: number) => void
-  onPlay?: (card: Card) => void | Promise<void | boolean>
+  seat: Seat;
+  state: GameState;
+  slot: TableSlot;
+  self: boolean;
+  spectating: boolean;
+  online: boolean;
+  revealCount?: number;
+  dealing?: boolean;
+  wonTrick?: boolean;
+  canManageBots?: boolean;
+  onMakeBot?: (seatIndex: number) => void;
+  onRemoveBot?: (seatIndex: number) => void;
+  onSwapSeats?: (seatIndex: number) => void;
+  onPlay?: (card: Card) => void | Promise<void | boolean>;
 }) {
-  const full = state.hands[seat.index] ?? []
-  const hand =
-    revealCount === undefined ? full : full.slice(0, revealCount)
-  const bid = state.bids[seat.index]
-  const tricks = state.tricks[seat.index]
-  const showFaces = self || spectating
+  const full = state.hands[seat.index] ?? [];
+  const hand = revealCount === undefined ? full : full.slice(0, revealCount);
+  const bid = state.bids[seat.index];
+  const tricks = state.tricks[seat.index];
+  const showFaces = self || spectating;
   const isTurn =
     (state.phase === "playing" || state.phase === "bidding") &&
-    state.currentSeat === seat.index
-  const dealer = state.dealer === seat.index
-  const sideways = slot === "west" || slot === "east"
+    state.currentSeat === seat.index;
+  const dealer = state.dealer === seat.index;
+  const sideways = slot === "west" || slot === "east";
 
   return (
     <div
@@ -136,13 +137,15 @@ export function PlayerSeat({
           slot === "east" && "[writing-mode:vertical-rl]"
         )}
       >
-        {dealer && (
-          <DealerButton name={seat.displayName ?? "This seat"} />
-        )}
+        {dealer && <DealerButton name={seat.displayName ?? "This seat"} />}
         <span
           className={cn(
             "text-sm font-medium",
-            isTurn ? "name-turn" : seat.displayName ? "text-white/80" : "text-white/50"
+            isTurn
+              ? "name-turn"
+              : seat.displayName
+              ? "text-white/80"
+              : "text-white/50"
           )}
         >
           {seat.displayName ?? <WaitingName />}
@@ -191,9 +194,7 @@ export function PlayerSeat({
             />
           )}
         </span>
-        {state.phase !== "lobby" && (
-          <BidIndicator bid={bid} tricks={tricks} />
-        )}
+        {state.phase !== "lobby" && <BidIndicator bid={bid} tricks={tricks} />}
       </div>
 
       {slot === "west" && (
@@ -208,8 +209,8 @@ export function PlayerSeat({
         </SideHand>
       )}
 
-      {slot === "south" && (
-        showFaces ? (
+      {slot === "south" &&
+        (showFaces ? (
           <OwnHand
             hand={hand}
             state={state}
@@ -221,10 +222,9 @@ export function PlayerSeat({
           <div className="flex items-end justify-center pt-1">
             <CardFan count={hand.length} faceDown size="lg" dealing={dealing} />
           </div>
-        )
-      )}
+        ))}
     </div>
-  )
+  );
 }
 
 function OwnHand({
@@ -234,62 +234,60 @@ function OwnHand({
   dealing,
   onPlay,
 }: {
-  hand: Card[]
-  state: GameState
-  seat: number
-  dealing?: boolean
-  onPlay?: (card: Card) => void | Promise<void | boolean>
+  hand: Card[];
+  state: GameState;
+  seat: number;
+  dealing?: boolean;
+  onPlay?: (card: Card) => void | Promise<void | boolean>;
 }) {
-  const confirmToPlay = useCoarsePointer()
-  const playOrigin = usePlayOrigin()
-  const cardNodes = useRef(new Map<string, HTMLElement>())
-  const [hover, setHover] = useState<number | null>(null)
-  const [picked, setPicked] = useState<number | null>(null)
-  const [pending, setPending] = useState(false)
-  const pendingRef = useRef(false)
-  const arriving = useArrivingIndex(hand.length, dealing)
+  const confirmToPlay = useCoarsePointer();
+  const playOrigin = usePlayOrigin();
+  const cardNodes = useRef(new Map<string, HTMLElement>());
+  const [hover, setHover] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+  const arriving = useArrivingIndex(hand.length, dealing);
   const spec = confirmToPlay
     ? { ...FAN_CARD.lg, radius: 300, maxHalfAngle: 12 }
-    : { ...FAN_CARD.xl, maxHalfAngle: 18 }
-  const gap = confirmToPlay ? 2.6 : 1.6
-  const cardSize = confirmToPlay ? "lg" : "xl"
-  const sample = fanPose(hand.length, 0, spec.radius, spec.maxHalfAngle, gap)
-  const width = Math.max(spec.w, 2 * Math.abs(sample.x) + spec.w)
-  const height = spec.h + sample.depth
+    : { ...FAN_CARD.xl, maxHalfAngle: 18 };
+  const gap = confirmToPlay ? 2.6 : 1.6;
+  const cardSize = confirmToPlay ? "lg" : "xl";
+  const sample = fanPose(hand.length, 0, spec.radius, spec.maxHalfAngle, gap);
+  const width = Math.max(spec.w, 2 * Math.abs(sample.x) + spec.w);
+  const height = spec.h + sample.depth;
   const ourTurn =
-    Boolean(onPlay) && state.phase === "playing" && state.currentSeat === seat
+    Boolean(onPlay) && state.phase === "playing" && state.currentSeat === seat;
 
   useEffect(() => {
-    setPicked(null)
-  }, [hand.length, ourTurn, confirmToPlay])
+    setPicked(null);
+  }, [hand.length, ourTurn, confirmToPlay]);
 
   function rememberOrigin(card: Card) {
-    const node = cardNodes.current.get(`${card.rank}${card.suit}`)
-    const felt = node?.closest(".felt")
-    if (!node || !felt || !playOrigin) return
-    playOrigin.set(seat, originFromElement(node, felt))
+    const node = cardNodes.current.get(`${card.rank}${card.suit}`);
+    const felt = node?.closest(".felt");
+    if (!node || !felt || !playOrigin) return;
+    playOrigin.set(seat, originFromElement(node, felt));
   }
 
   async function playNow(card: Card) {
-    if (!onPlay || pendingRef.current) return
-    if (!isLegalPlay(state, seat, card)) return
-    pendingRef.current = true
-    rememberOrigin(card)
-    setPending(true)
+    if (!onPlay || pendingRef.current) return;
+    if (!isLegalPlay(state, seat, card)) return;
+    pendingRef.current = true;
+    rememberOrigin(card);
+    setPending(true);
     try {
-      await onPlay(card)
-      setPicked(null)
+      await onPlay(card);
+      setPicked(null);
     } finally {
-      pendingRef.current = false
-      setPending(false)
+      pendingRef.current = false;
+      setPending(false);
     }
   }
 
-  const selectedCard = picked !== null ? hand[picked] ?? null : null
+  const selectedCard = picked !== null ? hand[picked] ?? null : null;
   const canPlaySelected =
-    selectedCard !== null &&
-    ourTurn &&
-    isLegalPlay(state, seat, selectedCard)
+    selectedCard !== null && ourTurn && isLegalPlay(state, seat, selectedCard);
 
   return (
     <div>
@@ -303,26 +301,37 @@ function OwnHand({
         onMouseLeave={() => setHover(null)}
       >
         {hand.map((card, index) => {
-          const canPlay = ourTurn && isLegalPlay(state, seat, card)
-          const pose = fanPose(hand.length, index, spec.radius, spec.maxHalfAngle, gap)
-          const spreadFrom = confirmToPlay ? picked : hover
+          const canPlay = ourTurn && isLegalPlay(state, seat, card);
+          const pose = fanPose(
+            hand.length,
+            index,
+            spec.radius,
+            spec.maxHalfAngle,
+            gap
+          );
+          const spreadFrom = confirmToPlay ? picked : hover;
           const spread =
             spreadFrom === null || index === spreadFrom
               ? 0
-              : Math.sign(index - spreadFrom) * neighborPush(Math.abs(index - spreadFrom))
-          const lift = !confirmToPlay && hover === index ? -6 : 0
+              : Math.sign(index - spreadFrom) *
+                neighborPush(Math.abs(index - spreadFrom));
+          const lift = !confirmToPlay && hover === index ? -6 : 0;
           return (
             <div
               key={`${card.rank}${card.suit}`}
               ref={(node) => {
-                const key = `${card.rank}${card.suit}`
-                if (node) cardNodes.current.set(key, node)
-                else cardNodes.current.delete(key)
+                const key = `${card.rank}${card.suit}`;
+                if (node) cardNodes.current.set(key, node);
+                else cardNodes.current.delete(key);
               }}
               className="absolute bottom-0 left-1/2 origin-bottom transition-transform duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
               onMouseEnter={() => setHover(index)}
               style={{
-                transform: `translateX(calc(-50% + ${pose.x + spread}px)) translateY(${pose.y - pose.depth + lift}px) rotate(${pose.rotate}deg)`,
+                transform: `translateX(calc(-50% + ${
+                  pose.x + spread
+                }px)) translateY(${pose.y - pose.depth + lift}px) rotate(${
+                  pose.rotate
+                }deg)`,
                 zIndex: index,
                 isolation: "isolate",
               }}
@@ -336,12 +345,14 @@ function OwnHand({
                   onClick={
                     canPlay
                       ? () => {
-                          if (pendingRef.current) return
+                          if (pendingRef.current) return;
                           if (confirmToPlay) {
-                            setPicked((current) => (current === index ? null : index))
-                            return
+                            setPicked((current) =>
+                              current === index ? null : index
+                            );
+                            return;
                           }
-                          void playNow(card)
+                          void playNow(card);
                         }
                       : undefined
                   }
@@ -349,7 +360,7 @@ function OwnHand({
                 />
               </DealIn>
             </div>
-          )
+          );
         })}
       </div>
       <div className="pointer-events-none fixed bottom-[calc(12rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 -translate-x-1/2">
@@ -358,40 +369,45 @@ function OwnHand({
           label="Play selected card"
           className="pointer-events-auto flex size-9 touch-manipulation items-center justify-center rounded-full bg-amber-200 text-[#16352b] shadow-[0_0_0_1px_rgb(251_191_36/0.45)] hover:bg-amber-100"
           onConfirm={() => {
-            if (selectedCard) return playNow(selectedCard)
+            if (selectedCard) return playNow(selectedCard);
           }}
         >
           <Check className="size-4" strokeWidth={2.75} />
         </PopConfirmButton>
       </div>
     </div>
-  )
+  );
 }
 
 function neighborPush(distance: number) {
-  if (distance === 1) return 10
-  if (distance === 2) return 6
-  return 3
+  if (distance === 1) return 10;
+  if (distance === 2) return 6;
+  return 3;
 }
 
 function SideHand({
   slot,
   children,
 }: {
-  slot: "west" | "east"
-  children: ReactNode
+  slot: "west" | "east";
+  children: ReactNode;
 }) {
   return (
     <div className="flex h-48 w-22 shrink-0 items-center justify-center overflow-visible">
-      <div className={cn("overflow-visible", slot === "west" ? "-rotate-90" : "rotate-90")}>
+      <div
+        className={cn(
+          "overflow-visible",
+          slot === "west" ? "-rotate-90" : "rotate-90"
+        )}
+      >
         {children}
       </div>
     </div>
-  )
+  );
 }
 
 function WaitingName() {
-  return <span className="waiting-shimmer">Waiting for player</span>
+  return <span className="waiting-shimmer">Waiting</span>;
 }
 
 function DealerButton({ name }: { name: string }) {
@@ -406,7 +422,7 @@ function DealerButton({ name }: { name: string }) {
       </TooltipTrigger>
       <TooltipContent>{name} is the dealer</TooltipContent>
     </Tooltip>
-  )
+  );
 }
 
 function SeatMenu({
@@ -416,18 +432,18 @@ function SeatMenu({
   onRemoveBot,
   onSwapSeats,
 }: {
-  seat: Seat
-  self: boolean
-  onMakeBot?: (seatIndex: number) => void
-  onRemoveBot?: (seatIndex: number) => void
-  onSwapSeats?: (seatIndex: number) => void
+  seat: Seat;
+  self: boolean;
+  onMakeBot?: (seatIndex: number) => void;
+  onRemoveBot?: (seatIndex: number) => void;
+  onSwapSeats?: (seatIndex: number) => void;
 }) {
-  const empty = !seat.playerId
-  const showMakeBot = empty && onMakeBot
-  const showRemoveBot = seat.isBot && onRemoveBot
-  const showSwap = !self && onSwapSeats
+  const empty = !seat.playerId;
+  const showMakeBot = empty && onMakeBot;
+  const showRemoveBot = seat.isBot && onRemoveBot;
+  const showSwap = !self && onSwapSeats;
 
-  if (!showMakeBot && !showRemoveBot && !showSwap) return null
+  if (!showMakeBot && !showRemoveBot && !showSwap) return null;
 
   return (
     <DropdownMenu>
@@ -437,7 +453,11 @@ function SeatMenu({
       >
         <Ellipsis className="size-3.5" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="bottom" className="w-auto min-w-36">
+      <DropdownMenuContent
+        align="start"
+        side="bottom"
+        className="w-auto min-w-36"
+      >
         {showMakeBot && (
           <DropdownMenuItem onClick={() => onMakeBot(seat.index)}>
             <Bot />
@@ -458,85 +478,29 @@ function SeatMenu({
         )}
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }
 
-function BidIndicator({
-  bid,
-  tricks,
-}: {
-  bid: number | null
-  tricks: number
-}) {
-  return (
-    <AnimatePresence>
-      {bid !== null && (
-        <motion.span
-          key="bid-indicator"
-          initial={{ opacity: 0, scale: 0.72, filter: "blur(3px)" }}
-          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-          exit={{ opacity: 0, scale: 0.72, filter: "blur(3px)" }}
-          transition={{ type: "spring", stiffness: 520, damping: 30, mass: 0.65 }}
-          className="inline-flex origin-center"
-        >
-          <Tooltip>
-            <TooltipTrigger
-              delay={200}
-              className="pointer-events-auto inline-flex leading-none"
-            >
-              <DiagonalFraction tricks={tricks} bid={bid} />
-            </TooltipTrigger>
-            <TooltipContent>{bidMadeLabel(bid, tricks)}</TooltipContent>
-          </Tooltip>
-        </motion.span>
-      )}
-    </AnimatePresence>
-  )
-}
-
-function DiagonalFraction({
-  tricks,
-  bid,
-}: {
-  tricks: number
-  bid: number
-}) {
-  const wide = tricks >= 10 || bid >= 10
+function BidIndicator({ bid, tricks }: { bid: number | null; tricks: number }) {
+  if (bid === null) return null
 
   return (
-    <span
-      className={cn(
-        "relative inline-block h-[1.05em] align-baseline leading-none text-white/50",
-        wide ? "w-[1.55em]" : "w-[1.15em]"
-      )}
-    >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute top-1/2 left-1/2 h-px w-[46%] -translate-x-1/2 -translate-y-1/2 -rotate-[62deg] bg-white/30"
-      />
-      <span className="absolute top-0 left-0 max-w-[70%] overflow-hidden leading-none">
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span
-            key={tricks}
-            initial={{ opacity: 0, x: -3, y: 2 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            exit={{ opacity: 0, x: 2, y: -2 }}
-            transition={{ duration: 0.17, ease: [0.22, 1, 0.36, 1] }}
-            className="block text-[10px] leading-none tabular-nums"
-          >
-            {tricks}
-          </motion.span>
-        </AnimatePresence>
-      </span>
-      <span className="absolute right-0 bottom-0 text-[10px] leading-none tabular-nums">
+    <Tooltip>
+      <TooltipTrigger
+        delay={200}
+        className="pointer-events-auto text-[10px] leading-none tabular-nums text-white/50"
+      >
+        {tricks}
+        <span className="text-white/30">/</span>
         {bid}
-      </span>
-    </span>
+      </TooltipTrigger>
+      <TooltipContent>{bidMadeLabel(bid, tricks)}</TooltipContent>
+    </Tooltip>
   )
 }
 
 function bidMadeLabel(bid: number | null, tricks: number) {
-  if (bid === null) return "No bid yet"
-  const bidWord = bid === 1 ? "trick" : "tricks"
-  return `Made ${tricks}, bid ${bid} ${bidWord}`
+  if (bid === null) return "No bid yet";
+  const bidWord = bid === 1 ? "trick" : "tricks";
+  return `Made ${tricks}, bid ${bid} ${bidWord}`;
 }
