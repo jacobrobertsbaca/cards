@@ -102,9 +102,7 @@ export function GameTable({
             dealing={motion.dealing}
             wonTrick={trickWinnerSeat === seat.index}
             onPlay={
-              self &&
-              (state.phase === "playing" || state.phase === "bidding") &&
-              !motion.dealing
+              self && state.phase === "playing" && !motion.dealing
                 ? onPlay
                 : undefined
             }

@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { Check, ClockCheck, Crown } from "lucide-react"
-import { sameCard } from "@/lib/game/cards"
-import { isLegalPlay, wouldBeLegalPlay } from "@/lib/game/engine"
+import { Check, Crown } from "lucide-react"
+import { isLegalPlay } from "@/lib/game/engine"
 import type { Card, GameState, Seat } from "@/lib/game/types"
 import { cn } from "@/lib/utils"
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer"
@@ -211,10 +210,8 @@ function OwnHand({
   const cardNodes = useRef(new Map<string, HTMLElement>())
   const [hover, setHover] = useState<number | null>(null)
   const [picked, setPicked] = useState<number | null>(null)
-  const [armed, setArmed] = useState<Card | null>(null)
   const [pending, setPending] = useState(false)
   const pendingRef = useRef(false)
-  const autoPlayedTurn = useRef<string | null>(null)
   const arriving = useArrivingIndex(hand.length, dealing)
   const spec = confirmToPlay
     ? { ...FAN_CARD.lg, radius: 300, maxHalfAngle: 12 }
@@ -224,44 +221,12 @@ function OwnHand({
   const sample = fanPose(hand.length, 0, spec.radius, spec.maxHalfAngle, gap)
   const width = Math.max(spec.w, 2 * Math.abs(sample.x) + spec.w)
   const height = spec.h + sample.depth
-  const ourTurn = state.phase === "playing" && state.currentSeat === seat
-  const ourBidTurn = state.phase === "bidding" && state.currentSeat === seat
-  const canSelect =
-    Boolean(onPlay) &&
-    !dealing &&
-    (state.phase === "playing" || state.phase === "bidding")
-
-  function canChoose(card: Card) {
-    if (!canSelect) return false
-    if (state.phase === "playing") return wouldBeLegalPlay(state, seat, card)
-    return true
-  }
-
-  function preselectOk(card: Card) {
-    if (!hand.some((item) => sameCard(item, card))) return false
-    if (state.phase === "bidding") return true
-    if (state.phase === "playing") return wouldBeLegalPlay(state, seat, card)
-    if (state.phase === "trick-end") {
-      return wouldBeLegalPlay({ ...state, phase: "playing" }, seat, card)
-    }
-    return false
-  }
-
-  const armedNow = armed !== null && preselectOk(armed) ? armed : null
-  const pickedNow =
-    picked !== null && hand[picked] && preselectOk(hand[picked]) ? picked : null
-  if (armed !== null && armedNow === null) setArmed(null)
-  if (picked !== null && pickedNow === null) setPicked(null)
+  const ourTurn =
+    Boolean(onPlay) && state.phase === "playing" && state.currentSeat === seat
 
   useEffect(() => {
     setPicked(null)
-  }, [hand.length, confirmToPlay])
-
-  useEffect(() => {
-    if (hover === null) return
-    const hovered = hand[hover]
-    if (!hovered || !canChoose(hovered)) setHover(null)
-  }, [dealing, hand, hover, onPlay, seat, state])
+  }, [hand.length, ourTurn, confirmToPlay])
 
   function rememberOrigin(card: Card) {
     const node = cardNodes.current.get(`${card.rank}${card.suit}`)
@@ -271,57 +236,26 @@ function OwnHand({
   }
 
   async function playNow(card: Card) {
-    if (!onPlay || pendingRef.current) return false
-    if (!isLegalPlay(state, seat, card)) return false
+    if (!onPlay || pendingRef.current) return
+    if (!isLegalPlay(state, seat, card)) return
     pendingRef.current = true
     rememberOrigin(card)
     setPending(true)
     try {
-      const played = await onPlay(card)
-      if (played === false) return false
-      setArmed(null)
+      await onPlay(card)
       setPicked(null)
-      return true
-    } catch {
-      autoPlayedTurn.current = null
-      return false
     } finally {
       pendingRef.current = false
       setPending(false)
     }
   }
 
-  const turnKey = ourTurn
-    ? `${state.roundIndex}-${state.currentTrick.length}-${seat}`
-    : null
-
-  useEffect(() => {
-    if (!turnKey || !armedNow || !onPlay) return
-    if (autoPlayedTurn.current === turnKey) return
-    if (!isLegalPlay(state, seat, armedNow)) return
-    autoPlayedTurn.current = turnKey
-    void playNow(armedNow)
-  }, [armedNow, onPlay, seat, state, turnKey])
-
-  const selectedCard =
-    armedNow ?? (pickedNow !== null ? hand[pickedNow] ?? null : null)
-  const selectedLegal = selectedCard !== null && canChoose(selectedCard)
-  const showArmControl =
-    canSelect &&
-    !ourTurn &&
-    !ourBidTurn &&
-    !armedNow &&
+  const selectedCard = picked !== null ? hand[picked] ?? null : null
+  const canPlaySelected =
     selectedCard !== null &&
-    selectedLegal
-  const showPlayControl =
-    confirmToPlay &&
-    canSelect &&
     ourTurn &&
-    !armedNow &&
     !pending &&
-    selectedCard !== null &&
     isLegalPlay(state, seat, selectedCard)
-  const showControl = showPlayControl || showArmControl
 
   return (
     <div>
@@ -334,15 +268,14 @@ function OwnHand({
         onMouseLeave={() => setHover(null)}
       >
         {hand.map((card, index) => {
-          const legal = canChoose(card)
-          const isArmed = armedNow !== null && sameCard(armedNow, card)
+          const canPlay = ourTurn && isLegalPlay(state, seat, card)
           const pose = fanPose(hand.length, index, spec.radius, spec.maxHalfAngle, gap)
-          const spreadFrom = confirmToPlay ? pickedNow : hover
+          const spreadFrom = confirmToPlay ? picked : hover
           const spread =
             spreadFrom === null || index === spreadFrom
               ? 0
               : Math.sign(index - spreadFrom) * neighborPush(Math.abs(index - spreadFrom))
-          const lift = !confirmToPlay && legal && hover === index ? -6 : 0
+          const lift = !confirmToPlay && hover === index ? -6 : 0
           return (
             <div
               key={`${card.rank}${card.suit}`}
@@ -351,11 +284,8 @@ function OwnHand({
                 if (node) cardNodes.current.set(key, node)
                 else cardNodes.current.delete(key)
               }}
-              className={cn(
-                "absolute bottom-0 left-1/2 origin-bottom transition-transform duration-200 ease-out",
-                !legal && "pointer-events-none"
-              )}
-              onMouseEnter={() => setHover(legal ? index : null)}
+              className="absolute bottom-0 left-1/2 origin-bottom transition-transform duration-200 ease-out"
+              onMouseEnter={() => setHover(index)}
               style={{
                 transform: `translateX(calc(-50% + ${pose.x + spread}px)) translateY(${pose.y - pose.depth + lift}px) rotate(${pose.rotate}deg)`,
                 zIndex: index,
@@ -366,23 +296,16 @@ function OwnHand({
                 <PlayingCard
                   card={card}
                   size={cardSize}
-                  selected={pickedNow === index || isArmed}
-                  armed={isArmed}
-                  disabled={!legal}
+                  selected={picked === index}
+                  disabled={ourTurn && !canPlay}
                   onClick={
-                    legal
+                    canPlay
                       ? () => {
-                          if (ourTurn && !confirmToPlay) {
-                            void playNow(card)
+                          if (confirmToPlay) {
+                            setPicked((current) => (current === index ? null : index))
                             return
                           }
-                          if (isArmed) {
-                            setArmed(null)
-                            setPicked(index)
-                            return
-                          }
-                          setArmed(null)
-                          setPicked((current) => (current === index ? null : index))
+                          void playNow(card)
                         }
                       : undefined
                   }
@@ -395,23 +318,14 @@ function OwnHand({
       </div>
       <div className="pointer-events-none fixed bottom-[calc(12rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 -translate-x-1/2">
         <PopConfirmButton
-          show={Boolean(showControl && selectedCard)}
-          label={showPlayControl ? "Play selected card" : "Arm selected card"}
+          show={confirmToPlay && canPlaySelected}
+          label="Play selected card"
           className="pointer-events-auto flex size-9 touch-manipulation items-center justify-center rounded-full bg-amber-200 text-[#16352b] shadow-[0_0_0_1px_rgb(251_191_36/0.45)] hover:bg-amber-100"
           onConfirm={() => {
-            if (!selectedCard) return
-            if (showPlayControl) {
-              void playNow(selectedCard)
-              return
-            }
-            setArmed(selectedCard)
+            if (selectedCard) void playNow(selectedCard)
           }}
         >
-          {showPlayControl ? (
-            <Check className="size-4" strokeWidth={2.75} />
-          ) : (
-            <ClockCheck className="size-4" strokeWidth={2.75} />
-          )}
+          <Check className="size-4" strokeWidth={2.75} />
         </PopConfirmButton>
       </div>
     </div>

@@ -15,16 +15,11 @@ const SIZES = {
   xl: "w-[6rem] h-[8.4rem] text-base rounded-xl",
 }
 
-function ArmRing() {
-  return <span className="card-arm-ring" aria-hidden />
-}
-
 export function PlayingCard({
   card,
   faceDown = false,
   size = "md",
   selected = false,
-  armed = false,
   disabled = false,
   onClick,
   className,
@@ -33,7 +28,6 @@ export function PlayingCard({
   faceDown?: boolean
   size?: keyof typeof SIZES
   selected?: boolean
-  armed?: boolean
   disabled?: boolean
   onClick?: () => void
   className?: string
@@ -53,13 +47,11 @@ export function PlayingCard({
           ? "border-[#1b2a4a] bg-[#243868] card-back"
           : "border-black/5 bg-[#fbfaf6]",
         onClick && !disabled && "[@media(hover:hover)]:hover:-translate-y-2 [@media(hover:hover)]:hover:shadow-lg",
-        selected && !armed && "border-transparent ring-[3px] ring-amber-300",
-        armed && "border-transparent",
+        selected && "border-transparent ring-[3px] ring-amber-300",
         disabled && "brightness-[0.55] saturate-50",
         className
       )}
     >
-      {armed && <ArmRing />}
       {faceDown || !card ? (
         <div className="absolute inset-[3px] rounded-[inherit] border border-white/15" />
       ) : (
