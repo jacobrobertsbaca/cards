@@ -31,13 +31,14 @@ import { rememberGame } from "@/lib/history"
 import { gameTooltip } from "@/lib/game/rules"
 import { playDeal, unlockAudio } from "@/lib/audio"
 import { sameCard } from "@/lib/game/cards"
+import { isTableEmote, type TableEmote } from "@/lib/emotes"
 import type { Card, GameState } from "@/lib/game/types"
 import { subscribeIdentity } from "@/lib/identity"
 import { GameTable } from "./table"
 import { BidPanel } from "./overlays"
 
 export function GameRoom({ code }: { code: string }) {
-  const { record, status, error, online, apply, identity } = useGame(code)
+  const { record, status, error, online, emotes, sendEmote, apply, identity } = useGame(code)
   const [spectating, setSpectating] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [optimisticState, setOptimisticState] = useState<GameState | null>(null)
@@ -235,12 +236,13 @@ export function GameRoom({ code }: { code: string }) {
 
   return (
     <ReadyTable
-      code={code}
       state={state}
       version={record?.version}
       mySeatIndex={mySeat?.index ?? null}
       role={role}
       online={online}
+      emotes={emotes}
+      onEmote={sendEmote}
       actionError={actionError}
       onJoin={() => void onJoin()}
       onSpectate={() => setSpectating(true)}
@@ -259,12 +261,13 @@ export function GameRoom({ code }: { code: string }) {
 }
 
 function ReadyTable({
-  code,
   state,
   version,
   mySeatIndex,
   role,
   online,
+  emotes,
+  onEmote,
   actionError,
   onJoin,
   onSpectate,
@@ -279,12 +282,13 @@ function ReadyTable({
   onSwapSeats,
   apply,
 }: {
-  code: string
   state: GameState
   version: number | undefined
   mySeatIndex: number | null
   role: "player" | "spectator" | "unknown"
   online: string[]
+  emotes: { id: string; playerId: string; emote: string }[]
+  onEmote: (emote: TableEmote) => void
   actionError: string | null
   onJoin: () => void
   onSpectate: () => void
@@ -323,6 +327,13 @@ function ReadyTable({
     state.phase === "trick-end" &&
     !motion.trickLeaving
 
+  const emotesBySeat: Record<number, { id: string; emote: TableEmote }> = {}
+  for (const event of emotes) {
+    if (!isTableEmote(event.emote)) continue
+    const seat = state.seats.find((item) => item.playerId === event.playerId)
+    if (seat) emotesBySeat[seat.index] = { id: event.id, emote: event.emote }
+  }
+
   useContinuePrompt(waitingToContinue, onAdvanceTrick)
   useJoinPrompt({
     active: showJoin,
@@ -354,11 +365,13 @@ function ReadyTable({
   return (
     <div className="relative h-full overflow-hidden">
       <GameTable
-        code={code}
         state={state}
         mySeat={mySeatIndex}
         spectating={role === "spectator"}
         onlineIds={online}
+        emotesBySeat={emotesBySeat}
+        canEmote={role === "player"}
+        onEmote={onEmote}
         motion={motion}
         onPlay={onPlay}
         onRename={onRename}

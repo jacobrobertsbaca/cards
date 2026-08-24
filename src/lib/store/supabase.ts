@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GameState } from "@/lib/game/types"
-import { VersionConflictError, type GameRecord, type GameStore } from "./types"
+import {
+  VersionConflictError,
+  type EmoteEvent,
+  type GameRecord,
+  type GameStore,
+} from "./types"
 
 type GameRow = {
   code: string
@@ -55,9 +60,26 @@ export function createSupabaseStore(client: SupabaseClient): GameStore {
       if (!data) throw new VersionConflictError()
       return toRecord(data as GameRow)
     },
-    subscribe(code, onChange) {
-      const channel = client
-        .channel(`game-row:${code}`)
+    connect(code, playerId, handlers) {
+      const channel = client.channel(`game:${code}`, {
+        config: { presence: { key: playerId } },
+      })
+      let ready = false
+      const queue: EmoteEvent[] = []
+
+      const flushEmote = (event: EmoteEvent) => {
+        void channel.send({
+          type: "broadcast",
+          event: "emote",
+          payload: event,
+        })
+      }
+
+      const publishPresence = () => {
+        handlers.onPresence(Object.keys(channel.presenceState()))
+      }
+
+      channel
         .on(
           "postgres_changes",
           {
@@ -68,31 +90,33 @@ export function createSupabaseStore(client: SupabaseClient): GameStore {
           },
           (payload) => {
             const row = (payload.new ?? payload.old) as GameRow | null
-            if (row?.state) onChange(toRecord(row))
+            if (row?.state) handlers.onChange(toRecord(row))
           }
         )
-        .subscribe()
-      return () => {
-        void client.removeChannel(channel)
-      }
-    },
-    trackPresence(code, playerId, onPresence) {
-      const channel = client.channel(`game-presence:${code}`, {
-        config: { presence: { key: playerId } },
-      })
-      const publish = () => {
-        const ids = Object.keys(channel.presenceState())
-        onPresence(ids)
-      }
-      channel
-        .on("presence", { event: "sync" }, publish)
-        .subscribe(async (status) => {
-          if (status === "SUBSCRIBED") {
-            await channel.track({ playerId })
-          }
+        .on("presence", { event: "sync" }, publishPresence)
+        .on("broadcast", { event: "emote" }, ({ payload }) => {
+          const data = payload as EmoteEvent | null
+          if (!data?.id || !data.playerId || !data.emote) return
+          handlers.onEmote(data)
         })
-      return () => {
-        void client.removeChannel(channel)
+        .subscribe(async (status) => {
+          if (status !== "SUBSCRIBED") return
+          ready = true
+          await channel.track({ playerId })
+          for (const event of queue.splice(0)) flushEmote(event)
+        })
+
+      return {
+        sendEmote: (event) => {
+          if (!ready) {
+            queue.push(event)
+            return
+          }
+          flushEmote(event)
+        },
+        disconnect: () => {
+          void client.removeChannel(channel)
+        },
       }
     },
   }

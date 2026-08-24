@@ -3,7 +3,7 @@ import { createLocalStore } from "./local"
 import { createSupabaseStore } from "./supabase"
 import type { GameStore } from "./types"
 
-export type { GameRecord, GameStore } from "./types"
+export type { EmoteEvent, GameRecord, GameStore } from "./types"
 export { VersionConflictError } from "./types"
 
 export function getGameStore(): GameStore {

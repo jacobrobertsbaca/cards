@@ -1,8 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { EMOTE_DURATION_MS, isTableEmote, type TableEmote } from "@/lib/emotes"
 import type { GameState } from "@/lib/game/types"
-import { getGameStore, VersionConflictError, type GameRecord } from "@/lib/store"
+import {
+  getGameStore,
+  VersionConflictError,
+  type EmoteEvent,
+  type GameRecord,
+} from "@/lib/store"
 import { useIdentity } from "./use-identity"
 
 export function useGame(code: string) {
@@ -13,15 +19,52 @@ export function useGame(code: string) {
   )
   const [error, setError] = useState<string | null>(null)
   const [online, setOnline] = useState<string[]>([])
+  const [emotes, setEmotes] = useState<EmoteEvent[]>([])
   const recordRef = useRef(record)
   recordRef.current = record
+  const sendEmoteRef = useRef<(event: EmoteEvent) => void>(() => {})
+  const emoteTimers = useRef(new Map<string, number>())
+  const seenEmotes = useRef(new Set<string>())
+
+  const clearEmote = useCallback((id: string) => {
+    const timer = emoteTimers.current.get(id)
+    if (timer) window.clearTimeout(timer)
+    emoteTimers.current.delete(id)
+    seenEmotes.current.delete(id)
+    setEmotes((current) => current.filter((item) => item.id !== id))
+  }, [])
+
+  const showEmote = useCallback(
+    (event: EmoteEvent) => {
+      if (!isTableEmote(event.emote)) return
+      if (seenEmotes.current.has(event.id)) return
+      seenEmotes.current.add(event.id)
+
+      setEmotes((current) => {
+        for (const prior of current) {
+          if (prior.playerId !== event.playerId) continue
+          const timer = emoteTimers.current.get(prior.id)
+          if (timer) window.clearTimeout(timer)
+          emoteTimers.current.delete(prior.id)
+          seenEmotes.current.delete(prior.id)
+        }
+        return [
+          ...current.filter((item) => item.playerId !== event.playerId),
+          event,
+        ]
+      })
+
+      const timer = window.setTimeout(() => clearEmote(event.id), EMOTE_DURATION_MS)
+      emoteTimers.current.set(event.id, timer)
+    },
+    [clearEmote]
+  )
 
   useEffect(() => {
     if (!identity.id) return
     const store = getGameStore()
     let cancelled = false
-    let unsub = () => {}
-    let unpres = () => {}
+    let disconnect = () => {}
 
     void (async () => {
       try {
@@ -33,10 +76,13 @@ export function useGame(code: string) {
         }
         setRecord(found)
         setStatus("ready")
-        unsub = store.subscribe(code, (next) => {
-          setRecord(next)
+        const room = store.connect(code, identity.id, {
+          onChange: setRecord,
+          onPresence: setOnline,
+          onEmote: showEmote,
         })
-        unpres = store.trackPresence(code, identity.id, setOnline)
+        sendEmoteRef.current = room.sendEmote
+        disconnect = room.disconnect
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : "Could not load game")
@@ -46,10 +92,14 @@ export function useGame(code: string) {
 
     return () => {
       cancelled = true
-      unsub()
-      unpres()
+      disconnect()
+      sendEmoteRef.current = () => {}
+      for (const timer of emoteTimers.current.values()) window.clearTimeout(timer)
+      emoteTimers.current.clear()
+      seenEmotes.current.clear()
+      setEmotes([])
     }
-  }, [code, identity.id])
+  }, [code, identity.id, showEmote])
 
   const apply = useCallback(
     async (mutate: (state: GameState) => GameState) => {
@@ -84,5 +134,19 @@ export function useGame(code: string) {
     [code]
   )
 
-  return { record, status, error, online, apply, identity }
+  const sendEmote = useCallback(
+    (emote: TableEmote) => {
+      if (!identity.id || !isTableEmote(emote)) return
+      const event: EmoteEvent = {
+        id: crypto.randomUUID(),
+        playerId: identity.id,
+        emote,
+      }
+      showEmote(event)
+      sendEmoteRef.current(event)
+    },
+    [identity.id, showEmote]
+  )
+
+  return { record, status, error, online, emotes, sendEmote, apply, identity }
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Bot, BotOff, Check, Crown, Ellipsis, Shuffle } from "lucide-react";
 import { isLegalPlay } from "@/lib/game/engine";
+import type { TableEmote } from "@/lib/emotes";
 import type { Card, GameState, Seat } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import {
@@ -18,6 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { EmoteIcon } from "./emote-icon";
 import { FAN_CARD, fanPose } from "./fan";
 import { PopConfirmButton } from "./pop-confirm";
 import { originFromElement, usePlayOrigin } from "./play-origin";
@@ -54,6 +56,19 @@ const SLOT_CLASS: Record<TableSlot, string> = {
     "top-[max(clamp(2.25rem,calc(2.25rem+max(0px,30rem-100vw)*0.08),3.5rem),env(safe-area-inset-top))] right-[min(22%,max(0.75rem,calc(50%-9rem)))] items-center",
 };
 
+const EMOTE_CLASS: Record<TableSlot, string> = {
+  south:
+    "-top-2 left-1/2 -translate-x-1/2 -translate-y-full [--emote-dx:0] [--emote-dy:-1]",
+  west: "top-1/2 -right-2 translate-x-full -translate-y-1/2 [--emote-dx:1] [--emote-dy:0]",
+  east: "top-1/2 -left-2 -translate-x-full -translate-y-1/2 [--emote-dx:-1] [--emote-dy:0]",
+  north:
+    "-bottom-2 left-1/2 -translate-x-1/2 translate-y-full [--emote-dx:0] [--emote-dy:1]",
+  "north-left":
+    "-bottom-2 left-1/2 -translate-x-1/2 translate-y-full [--emote-dx:0.25] [--emote-dy:1]",
+  "north-right":
+    "-bottom-2 left-1/2 -translate-x-1/2 translate-y-full [--emote-dx:-0.25] [--emote-dy:1]",
+};
+
 export function PlayerSeat({
   seat,
   state,
@@ -61,6 +76,7 @@ export function PlayerSeat({
   self,
   spectating,
   online,
+  emote,
   revealCount,
   dealing,
   wonTrick,
@@ -76,6 +92,7 @@ export function PlayerSeat({
   self: boolean;
   spectating: boolean;
   online: boolean;
+  emote?: { id: string; emote: TableEmote };
   revealCount?: number;
   dealing?: boolean;
   wonTrick?: boolean;
@@ -131,70 +148,96 @@ export function PlayerSeat({
 
       <div
         className={cn(
-          "flex items-center gap-2 text-white/90",
+          "relative",
           slot === "south" ? "mt-1 mb-7 md:mb-6" : "my-1",
-          slot === "west" && "[writing-mode:vertical-rl] rotate-180",
-          slot === "east" && "[writing-mode:vertical-rl]"
+          // Keep writing-mode on the sizing box for side seats. Without it,
+          // WebKit (iOS) sizes this wrapper like horizontal text and the
+          // vertical name hugs the right edge — clipping east seats.
+          (slot === "west" || slot === "east") &&
+            "w-max [writing-mode:vertical-rl]"
         )}
       >
-        {dealer && <DealerButton name={seat.displayName ?? "This seat"} />}
-        <span
+        {emote && (
+          <span
+            className={cn(
+              "pointer-events-none absolute z-30 [writing-mode:horizontal-tb]",
+              EMOTE_CLASS[slot]
+            )}
+          >
+            <span
+              key={emote.id}
+              aria-hidden
+              className="seat-emote block text-[1.75rem] drop-shadow-md"
+            >
+              <EmoteIcon emote={emote.emote} />
+            </span>
+          </span>
+        )}
+        <div
           className={cn(
-            "text-sm font-medium",
-            isTurn
-              ? "name-turn"
-              : seat.displayName
-              ? "text-white/80"
-              : "text-white/50"
+            "flex items-center gap-2 text-white/90",
+            slot === "west" && "rotate-180"
           )}
         >
-          {seat.displayName ?? <WaitingName />}
-        </span>
-        {wonTrick && (
-          <Tooltip>
-            <TooltipTrigger
-              delay={200}
-              className="pointer-events-auto inline-flex"
-            >
-              <Crown
-                aria-label="Won the trick"
-                className="size-3.5 shrink-0 fill-amber-200 text-amber-200"
+          {dealer && <DealerButton name={seat.displayName ?? "This seat"} />}
+          <span
+            className={cn(
+              "text-sm font-medium",
+              isTurn
+                ? "name-turn"
+                : seat.displayName
+                ? "text-white/80"
+                : "text-white/50"
+            )}
+          >
+            {seat.displayName ?? <WaitingName />}
+          </span>
+          {wonTrick && (
+            <Tooltip>
+              <TooltipTrigger
+                delay={200}
+                className="pointer-events-auto inline-flex"
+              >
+                <Crown
+                  aria-label="Won the trick"
+                  className="size-3.5 shrink-0 fill-amber-200 text-amber-200"
+                />
+              </TooltipTrigger>
+              <TooltipContent>
+                {seat.displayName ?? `Player ${seat.index + 1}`} won this trick
+              </TooltipContent>
+            </Tooltip>
+          )}
+          <span className="inline-flex items-center gap-1">
+            {seat.isBot ? (
+              <Bot
+                aria-label="Bot player"
+                className="size-3.5 shrink-0 text-white/50"
               />
-            </TooltipTrigger>
-            <TooltipContent>
-              {seat.displayName ?? `Player ${seat.index + 1}`} won this trick
-            </TooltipContent>
-          </Tooltip>
-        )}
-        <span className="inline-flex items-center gap-1">
-          {seat.isBot ? (
-            <Bot
-              aria-label="Bot player"
-              className="size-3.5 shrink-0 text-white/50"
-            />
-          ) : (
-            <span
-              className={cn(
-                "size-1.5 shrink-0 rounded-full",
-                seat.playerId
-                  ? online
-                    ? "bg-emerald-300"
-                    : "bg-white/30"
-                  : "bg-white/15"
-              )}
-            />
-          )}
-          {canManageBots && (
-            <SeatMenu
-              seat={seat}
-              self={self}
-              onMakeBot={onMakeBot}
-              onRemoveBot={onRemoveBot}
-              onSwapSeats={onSwapSeats}
-            />
-          )}
-        </span>
-        {state.phase !== "lobby" && <BidIndicator bid={bid} tricks={tricks} />}
+            ) : (
+              <span
+                className={cn(
+                  "size-1.5 shrink-0 rounded-full",
+                  seat.playerId
+                    ? online
+                      ? "bg-emerald-300"
+                      : "bg-white/30"
+                    : "bg-white/15"
+                )}
+              />
+            )}
+            {canManageBots && (
+              <SeatMenu
+                seat={seat}
+                self={self}
+                onMakeBot={onMakeBot}
+                onRemoveBot={onRemoveBot}
+                onSwapSeats={onSwapSeats}
+              />
+            )}
+          </span>
+          {state.phase !== "lobby" && <BidIndicator bid={bid} tricks={tricks} />}
+        </div>
       </div>
 
       {slot === "west" && (

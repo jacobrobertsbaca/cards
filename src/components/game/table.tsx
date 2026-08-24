@@ -1,18 +1,25 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Copy } from "lucide-react"
-import { trickWinner } from "@/lib/game/engine"
+import { MessageCircleHeart } from "lucide-react"
+import { EMOTE_LABELS, TABLE_EMOTES, type TableEmote } from "@/lib/emotes"
 import { rulesLine } from "@/lib/game/rules"
+import { trickWinner } from "@/lib/game/engine"
 import { displayGameTitle } from "@/lib/game/title"
 import type { Card, GameState } from "@/lib/game/types"
 import { cn } from "@/lib/utils"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import type { TableMotion } from "@/hooks/use-table-motion"
+import { EmoteIcon } from "./emote-icon"
 import { PlayerSeat, slotFor } from "./player-seat"
 import { Scoreboard } from "./score-sheet"
 import { DealOverlay } from "./deal-overlay"
@@ -21,11 +28,13 @@ import { TrickPile } from "./trick-pile"
 import { TrumpSpot } from "./trump-reveal"
 
 export function GameTable({
-  code,
   state,
   mySeat,
   spectating,
   onlineIds,
+  emotesBySeat,
+  canEmote,
+  onEmote,
   motion,
   onPlay,
   onRename,
@@ -34,11 +43,13 @@ export function GameTable({
   onRemoveBot,
   onSwapSeats,
 }: {
-  code: string
   state: GameState
   mySeat: number | null
   spectating: boolean
   onlineIds: string[]
+  emotesBySeat: Record<number, { id: string; emote: TableEmote }>
+  canEmote: boolean
+  onEmote: (emote: TableEmote) => void
   motion: TableMotion
   onPlay: (card: Card) => void | Promise<void | boolean>
   onRename: (title: string) => void
@@ -80,7 +91,7 @@ export function GameTable({
           <TitleEditor title={displayGameTitle(state.title)} onRename={onRename} />
           <p className="max-w-md text-xs text-white/55">{rulesLine(state.settings)}</p>
         </div>
-        <CopyLink code={code} />
+        {canEmote && <EmoteMenu onEmote={onEmote} />}
       </header>
 
       {trumpCard && (
@@ -116,6 +127,7 @@ export function GameTable({
             self={self}
             spectating={spectating}
             online={seat.playerId ? onlineIds.includes(seat.playerId) : false}
+            emote={emotesBySeat[seat.index]}
             revealCount={
               motion.dealing || motion.enteringDeal
                 ? motion.dealing
@@ -145,35 +157,42 @@ export function GameTable({
   )
 }
 
-function CopyLink({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false)
-
-  async function copy() {
-    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? ""
-    const url = `${window.location.origin}${base}/${code}`
-    await navigator.clipboard.writeText(url)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1500)
-  }
+function EmoteMenu({ onEmote }: { onEmote: (emote: TableEmote) => void }) {
+  const [open, setOpen] = useState(false)
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        delay={200}
-        onClick={() => void copy()}
-        aria-label={copied ? "Copied" : "Copy game link"}
-        className="pointer-events-auto ml-auto flex size-8 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white md:size-6 md:text-white/55"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        aria-label="React"
+        title="React"
+        className="pointer-events-auto ml-auto flex size-8 items-center justify-center rounded-md text-white hover:bg-white/10 md:size-6"
       >
-        {copied ? (
-          <Check className="size-3.5" />
-        ) : (
-          <Copy className="size-3.5" />
-        )}
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        {copied ? "Copied" : "Copy game link"}
-      </TooltipContent>
-    </Tooltip>
+        <MessageCircleHeart className="size-3.5" />
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        side="bottom"
+        sideOffset={6}
+        className="w-auto rounded-2xl border-0 bg-black/25 p-1.5 text-white shadow-none ring-1 ring-white/15 backdrop-blur-sm"
+      >
+        <div className="grid grid-cols-4 gap-0.5">
+          {TABLE_EMOTES.map((emote) => (
+            <button
+              key={emote}
+              type="button"
+              onClick={() => {
+                onEmote(emote)
+                setOpen(false)
+              }}
+              className="flex size-9 items-center justify-center rounded-full text-[1.35rem] transition-colors hover:bg-white/20 active:scale-95 md:size-8 md:text-xl"
+              aria-label={EMOTE_LABELS[emote]}
+            >
+              <EmoteIcon emote={emote} />
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -224,4 +243,3 @@ function TitleEditor({
     </Tooltip>
   )
 }
-

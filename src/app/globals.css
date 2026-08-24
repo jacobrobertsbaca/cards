@@ -383,6 +383,30 @@
   animation: waiting-shimmer 2.2s ease-in-out infinite;
 }
 
+@keyframes seat-emote {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  8% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(var(--emote-dx, 0) * 18px),
+      calc(var(--emote-dy, -1) * 18px)
+    );
+  }
+}
+
+.seat-emote {
+  animation: seat-emote 5s linear forwards;
+}
+
 .felt,
 .felt * {
   scrollbar-width: thin;
@@ -412,12 +436,17 @@
   .trump-enter,
   .trump-spin-run,
   .trump-fly,
-  .waiting-shimmer {
+  .waiting-shimmer,
+  .seat-emote {
     animation: none;
   }
 
   .waiting-shimmer {
     background: none;
     color: rgb(255 255 255 / 0.45);
+  }
+
+  .seat-emote {
+    opacity: 1;
   }
 }

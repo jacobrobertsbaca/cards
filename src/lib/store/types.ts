@@ -16,6 +16,23 @@ export class VersionConflictError extends Error {
 
 export type PresenceHandler = (playerIds: string[]) => void
 
+export type EmoteEvent = {
+  id: string
+  playerId: string
+  emote: string
+}
+
+export type RoomHandlers = {
+  onChange: (record: GameRecord) => void
+  onPresence: PresenceHandler
+  onEmote: (event: EmoteEvent) => void
+}
+
+export type RoomConnection = {
+  sendEmote: (event: EmoteEvent) => void
+  disconnect: () => void
+}
+
 export interface GameStore {
   create(record: Omit<GameRecord, "version">): Promise<GameRecord>
   get(code: string): Promise<GameRecord | null>
@@ -24,10 +41,9 @@ export interface GameStore {
     state: GameState,
     expectedVersion: number
   ): Promise<GameRecord>
-  subscribe(code: string, onChange: (record: GameRecord) => void): () => void
-  trackPresence(
+  connect(
     code: string,
     playerId: string,
-    onPresence: PresenceHandler
-  ): () => void
+    handlers: RoomHandlers
+  ): RoomConnection
 }
