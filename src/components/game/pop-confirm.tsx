@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { AnimatePresence, motion } from "motion/react"
+import { Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export function PopConfirmButton({
   show,
@@ -13,39 +15,45 @@ export function PopConfirmButton({
   show: boolean
   label: string
   className?: string
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
   children: ReactNode
 }) {
-  const [clicked, setClicked] = useState(false)
-  const pending = useRef(false)
+  const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
   const confirmRef = useRef(onConfirm)
   confirmRef.current = onConfirm
 
   useEffect(() => {
-    if (show) {
-      pending.current = false
-      setClicked(false)
+    if (!show) {
+      busyRef.current = false
+      setBusy(false)
     }
   }, [show])
 
-  const open = show && !clicked
+  async function handleClick() {
+    if (busyRef.current) return
+    busyRef.current = true
+    setBusy(true)
+    try {
+      await confirmRef.current()
+    } catch {
+      busyRef.current = false
+      setBusy(false)
+    }
+  }
 
   return (
-    <AnimatePresence
-      onExitComplete={() => {
-        if (!pending.current) return
-        pending.current = false
-        confirmRef.current()
-      }}
-    >
-      {open && (
+    <AnimatePresence>
+      {show && (
         <motion.button
           key="pop-confirm"
           type="button"
           aria-label={label}
+          aria-busy={busy}
+          disabled={busy}
           initial={{ opacity: 0, scale: 0.45, rotate: -18 }}
           animate={{
-            opacity: 1,
+            opacity: busy ? 0.55 : 1,
             scale: 1,
             rotate: 0,
             transition: { type: "spring", stiffness: 620, damping: 16, mass: 0.7 },
@@ -62,13 +70,17 @@ export function PopConfirmButton({
             },
           }}
           style={{ transformOrigin: "center" }}
-          onClick={() => {
-            pending.current = true
-            setClicked(true)
-          }}
-          className={className}
+          onClick={() => void handleClick()}
+          className={cn(
+            "disabled:pointer-events-none disabled:opacity-55",
+            className
+          )}
         >
-          {children}
+          {busy ? (
+            <Loader2 className="size-3.5 animate-spin md:size-4" strokeWidth={2.75} />
+          ) : (
+            children
+          )}
         </motion.button>
       )}
     </AnimatePresence>

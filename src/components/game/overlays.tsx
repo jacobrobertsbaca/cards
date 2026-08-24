@@ -14,15 +14,21 @@ export function BidPanel({
 }: {
   state: GameState
   seat: number
-  onBid: (bid: number) => void
+  onBid: (bid: number) => void | Promise<void>
 }) {
   const options = legalBids(state, seat)
   const [picked, setPicked] = useState<number | null>(null)
+  const [pending, setPending] = useState(false)
 
   return (
     <div className="pointer-events-auto absolute inset-x-0 bottom-[calc(12rem+env(safe-area-inset-bottom,0px))] z-40 flex justify-center px-2 md:bottom-[15rem]">
       <div className="flex w-full max-w-[min(24rem,calc(100vw-1rem))] items-center justify-center gap-1.5">
-        <div className="flex min-w-0 flex-1 items-center justify-center gap-0.5 rounded-full bg-black/25 p-1 backdrop-blur-sm md:flex-none md:gap-1.5 md:p-1.5">
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 items-center justify-center gap-0.5 rounded-full bg-black/25 p-1 backdrop-blur-sm md:flex-none md:gap-1.5 md:p-1.5",
+            pending && "pointer-events-none opacity-55"
+          )}
+        >
           {Array.from({ length: cardsThisRound(state) + 1 }, (_, bid) => {
             const legal = options.includes(bid)
             const selected = picked === bid
@@ -34,7 +40,7 @@ export function BidPanel({
               <button
                 key={bid}
                 type="button"
-                disabled={!legal}
+                disabled={!legal || pending}
                 aria-pressed={selected}
                 title={
                   taken
@@ -64,8 +70,15 @@ export function BidPanel({
           show={picked !== null}
           label={picked !== null ? `Confirm bid ${picked}` : "Confirm bid"}
           className="flex size-8 shrink-0 touch-manipulation items-center justify-center rounded-full bg-amber-200 text-[#16352b] shadow-[0_0_0_1px_rgb(251_191_36/0.45)] hover:bg-amber-100 md:size-9"
-          onConfirm={() => {
-            if (picked !== null) onBid(picked)
+          onConfirm={async () => {
+            if (picked === null) return
+            setPending(true)
+            try {
+              await onBid(picked)
+            } catch (error) {
+              setPending(false)
+              throw error
+            }
           }}
         >
           <Check className="size-3.5 md:size-4" strokeWidth={2.75} />

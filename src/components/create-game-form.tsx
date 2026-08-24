@@ -4,6 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Segmented } from "@/components/segmented";
 import { PatternEditor } from "@/components/pattern-editor";
 import { ScoringFormulaEditor } from "@/components/scoring-formula";
@@ -11,15 +20,21 @@ import { gameCode } from "@/lib/codes";
 import { createGame, joinGame } from "@/lib/game/engine";
 import { getIdentity } from "@/lib/identity";
 import { validatePattern, buildUpDown } from "@/lib/game/pattern";
-import { validateCondition, validateExpression } from "@/lib/game/formula";
-import { DEFAULT_FORMULA, type LeadTrump } from "@/lib/game/types";
+import { validateExpression } from "@/lib/game/formula";
+import {
+  DEFAULT_FORMULA,
+  type GameSettings,
+  type LeadTrump,
+} from "@/lib/game/types";
 import { rememberGame } from "@/lib/history";
 import { getGameStore } from "@/lib/store";
 import { gameTooltip } from "@/lib/game/rules";
 
+const items = [{ value: "oh-hell", label: "Oh Hell" }] as const;
+
 export function CreateGameForm() {
   const router = useRouter();
-  const [kind] = useState("oh-hell");
+  const [kind, setKind] = useState<GameSettings["kind"]>("oh-hell");
   const [seatCount, setSeatCount] = useState(2);
   const [pattern, setPattern] = useState(buildUpDown(10));
   const [leadTrump, setLeadTrump] = useState<LeadTrump>("after-broken");
@@ -29,12 +44,8 @@ export function CreateGameForm() {
   const [error, setError] = useState<string | null>(null);
 
   const patternError = validatePattern(pattern, seatCount);
-  const formulaError = scoring.cases
-    .flatMap((rule) => [
-      validateExpression(rule.expression),
-      validateCondition(rule.condition),
-    ])
-    .find(Boolean);
+  const formulaError =
+    validateExpression(scoring.made) || validateExpression(scoring.miss);
 
   async function onCreate() {
     if (patternError || formulaError) return;
@@ -42,7 +53,7 @@ export function CreateGameForm() {
     setError(null);
     try {
       const settings = {
-        kind: "oh-hell" as const,
+        kind,
         seatCount,
         pattern,
         leadTrump,
@@ -52,10 +63,10 @@ export function CreateGameForm() {
       const code = gameCode();
       const identity = getIdentity();
       const state = joinGame(createGame(settings), identity.id, identity.name);
-      await getGameStore().create({ code, kind: "oh-hell", state });
+      await getGameStore().create({ code, kind, state });
       rememberGame({
         code,
-        kind: "oh-hell",
+        kind,
         title: state.title,
         summary: gameTooltip(settings),
       });
@@ -72,11 +83,27 @@ export function CreateGameForm() {
     <div className="felt-ui mx-auto w-full max-w-lg space-y-8">
       <section className="space-y-3">
         <Label>Game</Label>
-        <Segmented
+        <Select
           value={kind}
-          onChange={() => {}}
-          options={[{ value: "oh-hell", label: "Oh Hell" }]}
-        />
+          onValueChange={(value) =>
+            value && setKind(value as GameSettings["kind"])
+          }
+          items={items}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Games</SelectLabel>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </section>
 
       <section className="space-y-3">
@@ -142,7 +169,7 @@ export function CreateGameForm() {
         <div className="space-y-1">
           <Label>Scoring</Label>
           <p className="text-xs text-muted-foreground">
-            Click to edit. Cases are tried from top to bottom.
+            Click to edit each score.
           </p>
         </div>
         <ScoringFormulaEditor value={scoring} onChange={setScoring} />

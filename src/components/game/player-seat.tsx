@@ -254,7 +254,6 @@ function OwnHand({
   const canPlaySelected =
     selectedCard !== null &&
     ourTurn &&
-    !pending &&
     isLegalPlay(state, seat, selectedCard)
 
   return (
@@ -262,7 +261,8 @@ function OwnHand({
       <div
         className={cn(
           "pointer-events-auto relative transition-opacity duration-200",
-          !ourTurn && "opacity-70"
+          (!ourTurn || pending) && "opacity-70",
+          pending && "pointer-events-none"
         )}
         style={{ width, height }}
         onMouseLeave={() => setHover(null)}
@@ -301,6 +301,7 @@ function OwnHand({
                   onClick={
                     canPlay
                       ? () => {
+                          if (pendingRef.current) return
                           if (confirmToPlay) {
                             setPicked((current) => (current === index ? null : index))
                             return
@@ -322,7 +323,7 @@ function OwnHand({
           label="Play selected card"
           className="pointer-events-auto flex size-9 touch-manipulation items-center justify-center rounded-full bg-amber-200 text-[#16352b] shadow-[0_0_0_1px_rgb(251_191_36/0.45)] hover:bg-amber-100"
           onConfirm={() => {
-            if (selectedCard) void playNow(selectedCard)
+            if (selectedCard) return playNow(selectedCard)
           }}
         >
           <Check className="size-4" strokeWidth={2.75} />

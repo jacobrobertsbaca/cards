@@ -57,7 +57,7 @@ export function GameTable({
         waiting && "cursor-pointer"
       )}
     >
-      <header className="pointer-events-none absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] left-[max(3.25rem,env(safe-area-inset-left))] z-20 flex items-start justify-between gap-4 text-white/80 md:left-4">
+      <header className="pointer-events-none absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.5rem,env(safe-area-inset-right))] left-[max(3.25rem,env(safe-area-inset-left))] z-20 flex items-start justify-between gap-4 text-white/80 md:left-4">
         <div className="hidden min-w-0 md:block">
           <TitleEditor title={displayGameTitle(state.title)} onRename={onRename} />
           <p className="max-w-md text-xs text-white/55">{rulesLine(state.settings)}</p>
@@ -134,7 +134,7 @@ function CopyLink({ code }: { code: string }) {
         delay={200}
         onClick={() => void copy()}
         aria-label={copied ? "Copied" : "Copy game link"}
-        className="pointer-events-auto ml-auto flex size-9 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white md:size-6 md:text-white/55"
+        className="pointer-events-auto ml-auto flex size-8 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white md:size-6 md:text-white/55"
       >
         {copied ? (
           <Check className="size-3.5" />

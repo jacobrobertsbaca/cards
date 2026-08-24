@@ -1,41 +1,7 @@
-import type { FormulaCase, ScoringFormula } from "./types"
+import type { ScoringFormula } from "./types"
 import { DEFAULT_FORMULA } from "./types"
 
-export const MATH_VARS = {
-  b: "Your bid this round",
-  t: "Tricks you took this round",
-} as const
-
-export type MathVar = keyof typeof MATH_VARS
-
-type Cmp = "=" | "≠" | "<" | ">" | "≤" | "≥"
 type Cursor = { tokens: string[]; i: number }
-
-const LEGACY: Record<string, string> = {
-  eq: "b = t",
-  neq: "b ≠ t",
-  gt: "b > t",
-  lt: "b < t",
-  always: "otherwise",
-}
-
-const CMP: Cmp[] = ["=", "≠", "<", ">", "≤", "≥"]
-const SPACED = new Set(["+", "-", "=", "≠", "<", ">", "≤", "≥", "and", "or", "·"])
-
-export function normalizeCondition(condition: string) {
-  return LEGACY[condition] ?? condition
-}
-
-export function isCatchAll(condition: string) {
-  try {
-    const tokens = tokenize(normalizeCondition(condition))
-    if (tokens.length === 0) return true
-    return tokens.length === 1 && tokens[0] === "true"
-  } catch {
-    const text = condition.trim().toLowerCase()
-    return ["otherwise", "else", "always", "true", ""].includes(text)
-  }
-}
 
 function tokenize(input: string) {
   const tokens: string[] = []
@@ -47,8 +13,8 @@ function tokenize(input: string) {
       continue
     }
     const two = input.slice(i, i + 2)
-    if (["==", "!=", "<=", ">=", "&&", "||", "**"].includes(two)) {
-      tokens.push(canonicalOp(two))
+    if (two === "**") {
+      tokens.push("^")
       i += 2
       continue
     }
@@ -57,8 +23,8 @@ function tokenize(input: string) {
       i += 1
       continue
     }
-    if ("+-*/()=<>".includes(ch)) {
-      tokens.push(canonicalOp(ch))
+    if ("+-*/()".includes(ch)) {
+      tokens.push(ch)
       i += 1
       continue
     }
@@ -88,25 +54,15 @@ function tokenize(input: string) {
 }
 
 function canonicalOp(op: string) {
-  if (op === "==") return "="
-  if (op === "!=" || op === "≠") return "≠"
-  if (op === "<=" || op === "≤") return "≤"
-  if (op === ">=" || op === "≥") return "≥"
   if (op === "*" || op === "·" || op === "×") return "*"
-  if (op === "**" || op === "^") return "^"
-  if (op === "&&") return "and"
-  if (op === "||") return "or"
+  if (op === "^") return "^"
   return op
 }
 
 function canonicalWord(word: string) {
   const key = word.toLowerCase()
-  if (key === "bid") return "b"
-  if (key === "tricks" || key === "taken") return "t"
-  if (["otherwise", "else", "always", "true"].includes(key)) return "true"
-  if (key === "and" || key === "or") return key
-  if (key === "b" || key === "t") return key
-  throw new Error(`Unknown name “${word}”`)
+  if (key === "t" || key === "tricks" || key === "taken") return "t"
+  throw new Error(`Only t is allowed`)
 }
 
 function peek(cur: Cursor) {
@@ -124,14 +80,14 @@ function eat(cur: Cursor, expected?: string) {
 }
 
 function isAtom(token: string | undefined) {
-  return token === "b" || token === "t" || Boolean(token && /^\d+$/.test(token))
+  return token === "t" || Boolean(token && /^\d+$/.test(token))
 }
 
-function parsePrimary(cur: Cursor, vars: FormulaVars): number {
+function parsePrimary(cur: Cursor, vars: { t: number }): number {
   const token = peek(cur)
-  if (token === "b" || token === "t") {
+  if (token === "t") {
     eat(cur)
-    return vars[token]
+    return vars.t
   }
   if (token === "(") {
     eat(cur)
@@ -146,7 +102,7 @@ function parsePrimary(cur: Cursor, vars: FormulaVars): number {
   throw new Error("Invalid scoring expression")
 }
 
-function parseUnary(cur: Cursor, vars: FormulaVars): number {
+function parseUnary(cur: Cursor, vars: { t: number }): number {
   if (peek(cur) === "-") {
     eat(cur)
     return -parseUnary(cur, vars)
@@ -158,14 +114,14 @@ function parseUnary(cur: Cursor, vars: FormulaVars): number {
   return parsePrimary(cur, vars)
 }
 
-function parsePow(cur: Cursor, vars: FormulaVars): number {
+function parsePow(cur: Cursor, vars: { t: number }): number {
   const value = parseUnary(cur, vars)
   if (peek(cur) !== "^") return value
   eat(cur)
   return value ** parsePow(cur, vars)
 }
 
-function parseMul(cur: Cursor, vars: FormulaVars): number {
+function parseMul(cur: Cursor, vars: { t: number }): number {
   let value = parsePow(cur, vars)
   while (true) {
     const next = peek(cur)
@@ -184,7 +140,7 @@ function parseMul(cur: Cursor, vars: FormulaVars): number {
   return value
 }
 
-function parseAdd(cur: Cursor, vars: FormulaVars): number {
+function parseAdd(cur: Cursor, vars: { t: number }): number {
   let value = parseMul(cur, vars)
   while (peek(cur) === "+" || peek(cur) === "-") {
     const op = eat(cur)
@@ -194,51 +150,7 @@ function parseAdd(cur: Cursor, vars: FormulaVars): number {
   return value
 }
 
-function compare(op: Cmp, left: number, right: number) {
-  if (op === "=") return left === right
-  if (op === "≠") return left !== right
-  if (op === "<") return left < right
-  if (op === ">") return left > right
-  if (op === "≤") return left <= right
-  return left >= right
-}
-
-function parseCmp(cur: Cursor, vars: FormulaVars): boolean {
-  if (peek(cur) === "true") {
-    eat(cur)
-    return true
-  }
-  const left = parseAdd(cur, vars)
-  const op = peek(cur)
-  if (op && (CMP as string[]).includes(op)) {
-    eat(cur)
-    return compare(op as Cmp, left, parseAdd(cur, vars))
-  }
-  throw new Error("Expected a comparison")
-}
-
-function parseAnd(cur: Cursor, vars: FormulaVars): boolean {
-  let value = parseCmp(cur, vars)
-  while (peek(cur) === "and") {
-    eat(cur)
-    const next = parseCmp(cur, vars)
-    value = value && next
-  }
-  return value
-}
-
-function parseOr(cur: Cursor, vars: FormulaVars): boolean {
-  let value = parseAnd(cur, vars)
-  while (peek(cur) === "or") {
-    eat(cur)
-    value = parseAnd(cur, vars) || value
-  }
-  return value
-}
-
-type FormulaVars = { b: number; t: number }
-
-function parseNumeric(input: string, vars: FormulaVars) {
+function parseNumeric(input: string, vars: { t: number }) {
   const cur: Cursor = { tokens: tokenize(input), i: 0 }
   if (cur.tokens.length === 0) throw new Error("Enter a score")
   const value = parseAdd(cur, vars)
@@ -246,16 +158,7 @@ function parseNumeric(input: string, vars: FormulaVars) {
   return value
 }
 
-function parseBoolean(input: string, vars: FormulaVars) {
-  const cur: Cursor = { tokens: tokenize(normalizeCondition(input)), i: 0 }
-  if (cur.tokens.length === 0) throw new Error("Enter a condition")
-  const value = parseOr(cur, vars)
-  if (cur.i !== cur.tokens.length) throw new Error("Invalid condition")
-  return value
-}
-
 function prettyFromTokens(tokens: string[]) {
-  if (tokens.length === 1 && tokens[0] === "true") return "otherwise"
   let text = ""
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i]
@@ -270,52 +173,28 @@ function prettyFromTokens(tokens: string[]) {
       text += juxtapose ? "" : "·"
       continue
     }
-    const shown =
-      token === "true" ? "otherwise" : token === "-" ? "−" : token === "*" ? "·" : token
-    const pad =
-      SPACED.has(token) ||
-      token === "-" ||
-      token === "and" ||
-      token === "or" ||
-      shown === "otherwise"
+    const shown = token === "-" ? "−" : token === "*" ? "·" : token
+    const pad = shown === "+" || shown === "−" || shown === "·"
     if (pad) text += ` ${shown} `
     else text += shown
   }
   return text.replace(/\s+/g, " ").trim()
 }
 
-function prettify(input: string, kind: "expr" | "cond") {
-  const source = kind === "cond" ? normalizeCondition(input) : input
-  const tokens = tokenize(source)
-  if (kind === "expr" && tokens.includes("true")) {
-    throw new Error("Invalid scoring expression")
-  }
-  return prettyFromTokens(tokens)
-}
-
 export function prettyExpression(expression: string) {
   try {
-    return prettify(expression, "expr")
+    return prettyFromTokens(tokenize(expression))
   } catch {
     return expression.trim()
   }
 }
 
-export function prettyCondition(condition: string) {
-  try {
-    return prettify(condition, "cond")
-  } catch {
-    return normalizeCondition(condition).trim()
-  }
-}
-
 export type MathToken =
-  | { kind: "var"; name: MathVar }
+  | { kind: "var"; name: "t" }
   | { kind: "text"; value: string }
 
-export function mathTokens(source: string, kind: "expr" | "cond"): MathToken[] {
-  const pretty = kind === "expr" ? prettyExpression(source) : prettyCondition(source)
-  return highlightMath(pretty)
+export function mathTokens(source: string): MathToken[] {
+  return highlightMath(prettyExpression(source))
 }
 
 export function highlightMath(text: string): MathToken[] {
@@ -324,11 +203,11 @@ export function highlightMath(text: string): MathToken[] {
   while (i < text.length) {
     const ch = text[i]
     const isolated =
-      (ch === "b" || ch === "t") &&
+      ch === "t" &&
       (i === 0 || !/[A-Za-z]/.test(text[i - 1])) &&
       (i === text.length - 1 || !/[A-Za-z]/.test(text[i + 1]))
     if (isolated) {
-      tokens.push({ kind: "var", name: ch })
+      tokens.push({ kind: "var", name: "t" })
       i += 1
       continue
     }
@@ -337,7 +216,7 @@ export function highlightMath(text: string): MathToken[] {
     while (i < text.length) {
       const next = text[i]
       const nextVar =
-        (next === "b" || next === "t") &&
+        next === "t" &&
         (i === 0 || !/[A-Za-z]/.test(text[i - 1])) &&
         (i === text.length - 1 || !/[A-Za-z]/.test(text[i + 1]))
       if (nextVar) break
@@ -354,57 +233,28 @@ export function evaluateFormula(
   bid: number,
   tricks: number
 ) {
-  const cases = formula.cases.length ? formula.cases : DEFAULT_FORMULA.cases
-  const vars = { b: bid, t: tricks }
-  for (const rule of cases) {
-    if (parseBoolean(rule.condition, vars)) {
-      const value = parseNumeric(rule.expression, vars)
-      if (!Number.isFinite(value)) {
-        throw new Error("Scoring formula produced a non-finite value")
-      }
-      return Math.trunc(value)
-    }
+  const fallback = DEFAULT_FORMULA
+  const made = formula.made || fallback.made
+  const miss = formula.miss || fallback.miss
+  const source = bid === tricks ? made : miss
+  const value = parseNumeric(source, { t: tricks })
+  if (!Number.isFinite(value)) {
+    throw new Error("Scoring formula produced a non-finite value")
   }
-  return 0
+  return Math.trunc(value)
 }
 
 export function formulaExplanation(formula: ScoringFormula) {
-  const lines = formula.cases.map((rule) => {
-    const expr = prettyExpression(rule.expression)
-    const cond = prettyCondition(rule.condition)
-    if (isCatchAll(rule.condition)) {
-      return `Otherwise you score ${expr}.`
-    }
-    return `If ${cond}, you score ${expr}.`
-  })
-  return `${lines.join(" ")} b is your bid, t is tricks taken.`
+  const made = prettyExpression(formula.made)
+  const miss = prettyExpression(formula.miss)
+  return `If bid made, you score ${made}. Otherwise you score ${miss}.`
 }
 
 export function validateExpression(expression: string) {
   try {
-    parseNumeric(expression, { b: 3, t: 2 })
+    parseNumeric(expression, { t: 2 })
     return null
   } catch (error) {
     return error instanceof Error ? error.message : "Invalid expression"
-  }
-}
-
-export function validateCondition(condition: string) {
-  try {
-    parseBoolean(condition, { b: 3, t: 2 })
-    return null
-  } catch (error) {
-    return error instanceof Error ? error.message : "Invalid condition"
-  }
-}
-
-export function newFormulaCase(
-  condition = "otherwise",
-  expression = "t"
-): FormulaCase {
-  return {
-    id: crypto.randomUUID(),
-    condition,
-    expression,
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useGame } from "@/hooks/use-game"
 import { useContinuePrompt } from "@/hooks/use-continue-prompt"
 import { useGameOverPrompt } from "@/hooks/use-game-over-prompt"
@@ -36,8 +36,12 @@ export function GameRoom({ code }: { code: string }) {
   const { record, status, error, online, apply, identity } = useGame(code)
   const [spectating, setSpectating] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [optimisticState, setOptimisticState] = useState<GameState | null>(null)
+  const optimisticPlay = useRef<Card | null>(null)
 
-  const state = record?.state
+  const state = optimisticState ?? record?.state
+  const stateRef = useRef(state)
+  stateRef.current = state
   const mySeat = state && identity.id ? seatForPlayer(state, identity.id) : null
   const role = mySeat
     ? "player"
@@ -68,6 +72,18 @@ export function GameRoom({ code }: { code: string }) {
     })
   }, [apply, identity.id, mySeat])
 
+  useEffect(() => {
+    const card = optimisticPlay.current
+    if (!card || mySeat == null || !record?.state) return
+    const stillInHand = record.state.hands[mySeat.index]?.some((item) =>
+      sameCard(item, card)
+    )
+    if (!stillInHand) {
+      optimisticPlay.current = null
+      setOptimisticState(null)
+    }
+  }, [mySeat, record?.state, record?.version])
+
   async function onJoin() {
     unlockAudio()
     setActionError(null)
@@ -86,35 +102,46 @@ export function GameRoom({ code }: { code: string }) {
       playDeal()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not bid")
+      throw err
     }
   }
 
   const onPlay = useCallback(async (card: Card) => {
     unlockAudio()
     if (mySeat == null) return false
-    try {
-      const next = await apply((current) => {
-        if (!isLegalPlay(current, mySeat.index, card)) return current
-        return playCard(current, mySeat.index, card)
+
+    const current = stateRef.current
+    if (!current || !isLegalPlay(current, mySeat.index, card)) return false
+
+    optimisticPlay.current = card
+    setOptimisticState(playCard(current, mySeat.index, card))
+    playDeal()
+    setActionError(null)
+
+    void apply((server) => {
+      if (!isLegalPlay(server, mySeat.index, card)) return server
+      return playCard(server, mySeat.index, card)
+    })
+      .then((next) => {
+        const stillInHand = next.state.hands[mySeat.index]?.some((item) =>
+          sameCard(item, card)
+        )
+        if (stillInHand) {
+          optimisticPlay.current = null
+          setOptimisticState(null)
+        }
       })
-      const stillInHand = next.state.hands[mySeat.index]?.some((item) =>
-        sameCard(item, card)
-      )
-      if (stillInHand) {
-        setActionError(null)
-        return false
-      }
-      setActionError(null)
-      playDeal()
-      return true
-    } catch (err) {
-      if (err instanceof GameError && err.message === "That card cannot be played") {
-        setActionError(null)
-        return false
-      }
-      setActionError(err instanceof Error ? err.message : "Could not play")
-      throw err
-    }
+      .catch((err) => {
+        optimisticPlay.current = null
+        setOptimisticState(null)
+        if (err instanceof GameError && err.message === "That card cannot be played") {
+          setActionError(null)
+          return
+        }
+        setActionError(err instanceof Error ? err.message : "Could not play")
+      })
+
+    return true
   }, [apply, mySeat])
 
   async function onAdvanceTrick() {
@@ -189,7 +216,7 @@ export function GameRoom({ code }: { code: string }) {
       onJoin={() => void onJoin()}
       onSpectate={() => setSpectating(true)}
       onStart={() => void onStart()}
-      onBid={(bid) => void onBid(bid)}
+      onBid={onBid}
       onPlay={onPlay}
       onAdvanceTrick={() => void onAdvanceTrick()}
       onContinue={() => void onContinue()}
@@ -223,7 +250,7 @@ function ReadyTable({
   onJoin: () => void
   onSpectate: () => void
   onStart: () => void
-  onBid: (bid: number) => void
+  onBid: (bid: number) => void | Promise<void>
   onPlay: (card: Card) => void | Promise<void | boolean>
   onAdvanceTrick: () => void
   onContinue: () => void

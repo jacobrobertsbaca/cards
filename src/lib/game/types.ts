@@ -25,14 +25,9 @@ export type Card = {
 
 export type LeadTrump = "always" | "after-broken"
 
-export type FormulaCase = {
-  id: string
-  condition: string
-  expression: string
-}
-
 export type ScoringFormula = {
-  cases: FormulaCase[]
+  made: string
+  miss: string
 }
 
 export type GameSettings = {
@@ -92,10 +87,8 @@ export type GameState = {
 }
 
 export const DEFAULT_FORMULA: ScoringFormula = {
-  cases: [
-    { id: "make", condition: "b = t", expression: "10 + t" },
-    { id: "miss", condition: "otherwise", expression: "t" },
-  ],
+  made: "10 + t",
+  miss: "t",
 }
 
 export const MIN_SEATS = 2

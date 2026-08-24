@@ -32,7 +32,7 @@ export function Scoreboard({ state }: { state: GameState }) {
     <Dialog>
       <DialogTrigger
         aria-label="Score sheet"
-        className="pointer-events-auto absolute right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 cursor-pointer text-white/70 outline-none hover:text-white focus-visible:text-white md:right-4 md:bottom-4"
+        className="pointer-events-auto absolute right-[max(0.5rem,env(safe-area-inset-right))] bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-20 cursor-pointer text-white/70 outline-none hover:text-white focus-visible:text-white md:right-4 md:bottom-4"
       >
         <span className="hidden text-right text-xs md:block">
           {standings.map((row) => (
@@ -42,7 +42,7 @@ export function Scoreboard({ state }: { state: GameState }) {
             </div>
           ))}
         </span>
-        <span className="flex size-9 items-center justify-center rounded-md hover:bg-white/10 md:hidden">
+        <span className="flex size-8 items-center justify-center rounded-md hover:bg-white/10 md:hidden">
           <ClipboardList className="size-4" />
         </span>
       </DialogTrigger>
