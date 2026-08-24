@@ -45,7 +45,7 @@ export function useBotController(
           // Ignore races when multiple clients apply the same bot move.
         }
       })()
-    }, 450)
+    }, 700)
 
     return () => window.clearTimeout(timer)
   }, [

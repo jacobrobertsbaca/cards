@@ -4,17 +4,16 @@ import {
   defaultSettings,
   evolveParams,
   makeParamBot,
+  makeStrongBot,
   runCandidateVsLegacy,
 } from "./sim"
 
-const gamesPerCandidate = Number(process.env.BOT_TRAIN_GAMES ?? 48)
-const generations = Number(process.env.BOT_TRAIN_GENERATIONS ?? 45)
-const population = Number(process.env.BOT_TRAIN_POPULATION ?? 28)
-const validationGames = Number(process.env.BOT_TRAIN_VALIDATE ?? 240)
+const gamesPerCandidate = Number(process.env.BOT_TRAIN_GAMES ?? 36)
+const generations = Number(process.env.BOT_TRAIN_GENERATIONS ?? 24)
+const population = Number(process.env.BOT_TRAIN_POPULATION ?? 20)
+const validationGames = Number(process.env.BOT_TRAIN_VALIDATE ?? 80)
 
-const baseline = runCandidateVsLegacy(LEGACY_BOT, validationGames)
-const baselineAvg = baseline[0] / validationGames
-
+console.log("Evolving rollout heuristic weights...")
 const { params, score } = evolveParams({
   generations,
   population,
@@ -22,16 +21,24 @@ const { params, score } = evolveParams({
   seed: TRAINED_BOT_PARAMS,
 })
 
-const candidate = makeParamBot(params)
-const trained = runCandidateVsLegacy(candidate, validationGames)
-const trainedAvg = trained[0] / validationGames
-const legacyAvg = trained.slice(1).reduce((sum, value) => sum + value, 0) /
-  (validationGames * (defaultSettings().seatCount - 1))
+const heuristic = makeParamBot(params)
+const strong = makeStrongBot(params)
+
+console.log("Validating against legacy...")
+const heuristicTotals = runCandidateVsLegacy(heuristic, validationGames)
+const strongTotals = runCandidateVsLegacy(strong, validationGames)
+const seats = defaultSettings().seatCount - 1
+
+const heuristicAvg = heuristicTotals[0] / validationGames
+const strongAvg = strongTotals[0] / validationGames
+const legacyVsStrong =
+  strongTotals.slice(1).reduce((sum, value) => sum + value, 0) /
+  (validationGames * seats)
 
 console.log("Training complete")
-console.log(`Baseline seat-0 avg (legacy mirror): ${baselineAvg.toFixed(2)}`)
-console.log(`Evolution best raw score (${gamesPerCandidate}-game eval): ${score.toFixed(1)}`)
-console.log(`Trained seat-0 avg: ${trainedAvg.toFixed(2)}`)
-console.log(`Legacy opponent avg: ${legacyAvg.toFixed(2)}`)
-console.log(`Advantage: ${(trainedAvg - legacyAvg).toFixed(2)} points/game`)
+console.log(`Evolution best raw score: ${score.toFixed(1)}`)
+console.log(`Heuristic vs legacy (seat 0): ${heuristicAvg.toFixed(2)}`)
+console.log(`Search bot vs legacy (seat 0): ${strongAvg.toFixed(2)}`)
+console.log(`Legacy avg vs search bot: ${legacyVsStrong.toFixed(2)}`)
+console.log(`Search advantage: ${(strongAvg - legacyVsStrong).toFixed(2)} points/game`)
 console.log(JSON.stringify(params, null, 2))

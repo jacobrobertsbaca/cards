@@ -42,25 +42,28 @@ export const DEFAULT_BOT_PARAMS: BotParams = {
   leadLoserRank: 0.9,
 }
 
-/** Weights from offline evolution against the legacy naive bot. */
+/**
+ * Weights from offline evolution + hand-tuned floors so offsuit winners
+ * stay respected against human opponents.
+ */
 export const TRAINED_BOT_PARAMS: BotParams = {
-  ace: 0.30012702269199243,
-  king: 0.20184887591010311,
-  queen: 0.350640793011178,
-  jack: 0,
-  trumpAce: 1.2988100732138121,
-  trumpKing: 1.0169786159686662,
-  trumpQueen: 0.6855969738429248,
-  trumpJack: 0.4360171762360896,
-  trumpLow: 0.5185507213800231,
-  longSuitPerCard: 0.21346697631208666,
-  shortSuitPenalty: 0,
-  voidBonus: 0.4097462899190196,
-  bidConservatism: 0.17736437636553765,
-  hookPush: 0.8990746364448359,
-  winWithLowRank: 1.673321836214416,
-  loseWithHighRank: 1.2112691027327356,
-  trumpOnlyWhenNeed: 1.087479439034401,
-  leadWinnerRank: 1.4068764778599665,
-  leadLoserRank: 0.8504931996828216,
+  ace: 0.72,
+  king: 0.35,
+  queen: 0.31619970873995346,
+  jack: 0.0989145110704851,
+  trumpAce: 1.4094275292122485,
+  trumpKing: 1.0394557013620112,
+  trumpQueen: 0.55,
+  trumpJack: 0.42572058365085,
+  trumpLow: 0.631100661038865,
+  longSuitPerCard: 0.12,
+  shortSuitPenalty: 0.05,
+  voidBonus: 0.614355088008503,
+  bidConservatism: 0.1,
+  hookPush: 0.8195068155902121,
+  winWithLowRank: 1.50460464107791,
+  loseWithHighRank: 1.25,
+  trumpOnlyWhenNeed: 0.95,
+  leadWinnerRank: 1.6483431880501764,
+  leadLoserRank: 1.2915444257052706,
 }

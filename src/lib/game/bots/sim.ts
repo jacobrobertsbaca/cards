@@ -13,14 +13,13 @@ import {
   wouldBeLegalPlay,
 } from "../engine"
 import type { Card, GameSettings, GameState } from "../types"
-import { createParamBot } from "./index"
 import type { BotParams } from "./params"
-import { DEFAULT_BOT_PARAMS } from "./params"
+import { DEFAULT_BOT_PARAMS, TRAINED_BOT_PARAMS } from "./params"
+import type { BotBrain } from "./policy"
+import { heuristicPlay, makeHeuristicBot } from "./policy"
+import { searchBid, searchPlay } from "./search"
 
-export type BotBrain = {
-  chooseBid: (state: GameState, seat: number) => number
-  choosePlay: (state: GameState, seat: number) => Card
-}
+export type { BotBrain }
 
 function legacyHandStrength(hand: Card[], trump: Card | null) {
   const trumpSuit = trump?.suit
@@ -242,7 +241,30 @@ export function runCandidateVsLegacy(
 }
 
 export function makeParamBot(params: BotParams): BotBrain {
-  return createParamBot(params)
+  return makeHeuristicBot(params)
+}
+
+function needsDeepPlaySearch(state: GameState, seat: number) {
+  const bid = state.bids[seat] ?? 0
+  const tricks = state.tricks[seat]
+  const need = bid - tricks
+  const left = state.hands[seat].length
+  if (left <= 2) return true
+  if (need >= left || need <= 0) return true
+  if (Math.abs(need) <= 1 && left <= 4) return true
+  if (state.currentTrick.length === state.settings.seatCount - 1) return true
+  return false
+}
+
+export function makeStrongBot(params: BotParams = TRAINED_BOT_PARAMS): BotBrain {
+  const active = params
+  return {
+    chooseBid: (state, seat) => searchBid(state, seat, active),
+    choosePlay: (state, seat) =>
+      needsDeepPlaySearch(state, seat)
+        ? searchPlay(state, seat, active)
+        : heuristicPlay(state, seat, active),
+  }
 }
 
 export function evaluateParams(params: BotParams, games: number) {
@@ -259,10 +281,19 @@ export function mutateParams(
   scale: number
 ): BotParams {
   const next = { ...params }
+  const floors: Partial<BotParams> = {
+    ace: 0.45,
+    king: 0.15,
+    trumpAce: 0.85,
+    trumpKing: 0.55,
+    voidBonus: 0.1,
+    winWithLowRank: 0.8,
+    loseWithHighRank: 0.8,
+  }
   for (const key of Object.keys(next) as (keyof BotParams)[]) {
     if (Math.random() > rate) continue
     const delta = (Math.random() * 2 - 1) * scale
-    next[key] = Math.max(0, next[key] + delta)
+    next[key] = Math.max(floors[key] ?? 0, next[key] + delta)
   }
   return next
 }
