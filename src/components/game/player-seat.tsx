@@ -1,10 +1,17 @@
 "use client"
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { Check, Crown } from "lucide-react"
+import { AnimatePresence, motion } from "motion/react"
+import { Bot, BotOff, Check, Crown, Ellipsis, Shuffle } from "lucide-react"
 import { isLegalPlay } from "@/lib/game/engine"
 import type { Card, GameState, Seat } from "@/lib/game/types"
 import { cn } from "@/lib/utils"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer"
 import { useArrivingIndex } from "@/hooks/use-deal-in"
 import {
@@ -38,9 +45,11 @@ const SLOT_CLASS: Record<TableSlot, string> = {
   west: "left-[max(0.75rem,env(safe-area-inset-left))] top-1/2 -translate-y-1/2 items-center",
   east: "right-[max(0.75rem,env(safe-area-inset-right))] top-1/2 -translate-y-1/2 items-center",
   north:
-    "top-[max(0.75rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 items-center",
-  "north-left": "top-[max(1.5rem,env(safe-area-inset-top))] left-[22%] items-center",
-  "north-right": "top-[max(1.5rem,env(safe-area-inset-top))] right-[22%] items-center",
+    "top-[max(2rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 items-center",
+  "north-left":
+    "top-[max(clamp(2.25rem,calc(2.25rem+max(0px,30rem-100vw)*0.08),3.5rem),env(safe-area-inset-top))] left-[min(22%,max(0.75rem,calc(50%-9rem)))] items-center",
+  "north-right":
+    "top-[max(clamp(2.25rem,calc(2.25rem+max(0px,30rem-100vw)*0.08),3.5rem),env(safe-area-inset-top))] right-[min(22%,max(0.75rem,calc(50%-9rem)))] items-center",
 }
 
 export function PlayerSeat({
@@ -52,8 +61,11 @@ export function PlayerSeat({
   online,
   revealCount,
   dealing,
-  clearing,
   wonTrick,
+  canManageBots,
+  onMakeBot,
+  onRemoveBot,
+  onSwapSeats,
   onPlay,
 }: {
   seat: Seat
@@ -64,12 +76,16 @@ export function PlayerSeat({
   online: boolean
   revealCount?: number
   dealing?: boolean
-  clearing?: boolean
   wonTrick?: boolean
+  canManageBots?: boolean
+  onMakeBot?: (seatIndex: number) => void
+  onRemoveBot?: (seatIndex: number) => void
+  onSwapSeats?: (seatIndex: number) => void
   onPlay?: (card: Card) => void | Promise<void | boolean>
 }) {
   const full = state.hands[seat.index] ?? []
-  const hand = revealCount === undefined ? full : full.slice(0, revealCount)
+  const hand =
+    revealCount === undefined ? full : full.slice(0, revealCount)
   const bid = state.bids[seat.index]
   const tricks = state.tricks[seat.index]
   const showFaces = self || spectating
@@ -86,8 +102,7 @@ export function PlayerSeat({
         sideways
           ? "flex-row items-center gap-2"
           : "max-w-[min(calc(100vw-7.5rem),48rem)] flex-col",
-        SLOT_CLASS[slot],
-        clearing && "table-clear"
+        SLOT_CLASS[slot]
       )}
     >
       {slot.startsWith("north") && (
@@ -133,31 +148,51 @@ export function PlayerSeat({
           {seat.displayName ?? <WaitingName />}
         </span>
         {wonTrick && (
-          <Crown
-            aria-label="Won the trick"
-            className="size-3.5 shrink-0 fill-amber-200 text-amber-200"
-          />
-        )}
-        <span
-          className={cn(
-            "size-1.5 shrink-0 rounded-full",
-            seat.playerId
-              ? online
-                ? "bg-emerald-300"
-                : "bg-white/30"
-              : "bg-white/15"
-          )}
-        />
-        {state.phase !== "lobby" && (
           <Tooltip>
             <TooltipTrigger
               delay={200}
-              className="pointer-events-auto font-mono text-xs text-white/70"
+              className="pointer-events-auto inline-flex"
             >
-              {bid === null ? "–" : `${tricks}/${bid}`}
+              <Crown
+                aria-label="Won the trick"
+                className="size-3.5 shrink-0 fill-amber-200 text-amber-200"
+              />
             </TooltipTrigger>
-            <TooltipContent>{bidMadeLabel(bid, tricks)}</TooltipContent>
+            <TooltipContent>
+              {seat.displayName ?? `Player ${seat.index + 1}`} won this trick
+            </TooltipContent>
           </Tooltip>
+        )}
+        <span className="inline-flex items-center gap-1">
+          {seat.isBot ? (
+            <Bot
+              aria-label="Bot player"
+              className="size-3.5 shrink-0 text-white/50"
+            />
+          ) : (
+            <span
+              className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                seat.playerId
+                  ? online
+                    ? "bg-emerald-300"
+                    : "bg-white/30"
+                  : "bg-white/15"
+              )}
+            />
+          )}
+          {canManageBots && (
+            <SeatMenu
+              seat={seat}
+              self={self}
+              onMakeBot={onMakeBot}
+              onRemoveBot={onRemoveBot}
+              onSwapSeats={onSwapSeats}
+            />
+          )}
+        </span>
+        {state.phase !== "lobby" && (
+          <BidIndicator bid={bid} tricks={tricks} />
         )}
       </div>
 
@@ -356,12 +391,7 @@ function SideHand({
 }
 
 function WaitingName() {
-  return (
-    <>
-      Waiting for player
-      <span className="waiting-ellipsis" aria-hidden="true" />
-    </>
-  )
+  return <span className="waiting-shimmer">Waiting for player</span>
 }
 
 function DealerButton({ name }: { name: string }) {
@@ -376,6 +406,132 @@ function DealerButton({ name }: { name: string }) {
       </TooltipTrigger>
       <TooltipContent>{name} is the dealer</TooltipContent>
     </Tooltip>
+  )
+}
+
+function SeatMenu({
+  seat,
+  self,
+  onMakeBot,
+  onRemoveBot,
+  onSwapSeats,
+}: {
+  seat: Seat
+  self: boolean
+  onMakeBot?: (seatIndex: number) => void
+  onRemoveBot?: (seatIndex: number) => void
+  onSwapSeats?: (seatIndex: number) => void
+}) {
+  const empty = !seat.playerId
+  const showMakeBot = empty && onMakeBot
+  const showRemoveBot = seat.isBot && onRemoveBot
+  const showSwap = !self && onSwapSeats
+
+  if (!showMakeBot && !showRemoveBot && !showSwap) return null
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="Seat options"
+        className="pointer-events-auto flex size-5 shrink-0 items-center justify-center rounded-md text-white/45 hover:bg-white/10 hover:text-white/80"
+      >
+        <Ellipsis className="size-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="bottom" className="w-auto min-w-36">
+        {showMakeBot && (
+          <DropdownMenuItem onClick={() => onMakeBot(seat.index)}>
+            <Bot />
+            Make bot
+          </DropdownMenuItem>
+        )}
+        {showSwap && (
+          <DropdownMenuItem onClick={() => onSwapSeats(seat.index)}>
+            <Shuffle />
+            Change places
+          </DropdownMenuItem>
+        )}
+        {showRemoveBot && (
+          <DropdownMenuItem onClick={() => onRemoveBot(seat.index)}>
+            <BotOff />
+            Remove bot
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function BidIndicator({
+  bid,
+  tricks,
+}: {
+  bid: number | null
+  tricks: number
+}) {
+  return (
+    <AnimatePresence>
+      {bid !== null && (
+        <motion.span
+          key="bid-indicator"
+          initial={{ opacity: 0, scale: 0.72, filter: "blur(3px)" }}
+          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+          exit={{ opacity: 0, scale: 0.72, filter: "blur(3px)" }}
+          transition={{ type: "spring", stiffness: 520, damping: 30, mass: 0.65 }}
+          className="inline-flex origin-center"
+        >
+          <Tooltip>
+            <TooltipTrigger
+              delay={200}
+              className="pointer-events-auto inline-flex leading-none"
+            >
+              <DiagonalFraction tricks={tricks} bid={bid} />
+            </TooltipTrigger>
+            <TooltipContent>{bidMadeLabel(bid, tricks)}</TooltipContent>
+          </Tooltip>
+        </motion.span>
+      )}
+    </AnimatePresence>
+  )
+}
+
+function DiagonalFraction({
+  tricks,
+  bid,
+}: {
+  tricks: number
+  bid: number
+}) {
+  const wide = tricks >= 10 || bid >= 10
+
+  return (
+    <span
+      className={cn(
+        "relative inline-block h-[1.05em] align-baseline leading-none text-white/50",
+        wide ? "w-[1.55em]" : "w-[1.15em]"
+      )}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 left-1/2 h-px w-[46%] -translate-x-1/2 -translate-y-1/2 -rotate-[62deg] bg-white/30"
+      />
+      <span className="absolute top-0 left-0 max-w-[70%] overflow-hidden leading-none">
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={tricks}
+            initial={{ opacity: 0, x: -3, y: 2 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 2, y: -2 }}
+            transition={{ duration: 0.17, ease: [0.22, 1, 0.36, 1] }}
+            className="block text-[10px] leading-none tabular-nums"
+          >
+            {tricks}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+      <span className="absolute right-0 bottom-0 text-[10px] leading-none tabular-nums">
+        {bid}
+      </span>
+    </span>
   )
 }
 

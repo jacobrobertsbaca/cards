@@ -29,6 +29,10 @@ export function GameTable({
   motion,
   onPlay,
   onRename,
+  canManageBots,
+  onMakeBot,
+  onRemoveBot,
+  onSwapSeats,
 }: {
   code: string
   state: GameState
@@ -38,15 +42,29 @@ export function GameTable({
   motion: TableMotion
   onPlay: (card: Card) => void | Promise<void | boolean>
   onRename: (title: string) => void
+  canManageBots?: boolean
+  onMakeBot?: (seatIndex: number) => void
+  onRemoveBot?: (seatIndex: number) => void
+  onSwapSeats?: (seatIndex: number) => void
 }) {
   const anchor = mySeat ?? 0
   const count = state.settings.seatCount
   const waiting =
     (state.phase === "trick-end" && !motion.trickLeaving) ||
     state.phase === "round-end"
-  const trickWinnerSeat =
-    state.phase === "trick-end" && state.lastTrick.length > 0
+  const heldTrickWinner =
+    (state.phase === "trick-end" ||
+      state.phase === "round-end" ||
+      state.phase === "game-over") &&
+    state.lastTrick.length > 0
       ? trickWinner(state.lastTrick, state.trump)
+      : null
+  const trickWinnerSeat = motion.trickWinnerSeat ?? heldTrickWinner
+  const trumpCard =
+    !motion.enteringDeal &&
+    state.trump &&
+    motion.trumpPhase !== "hidden"
+      ? state.trump
       : null
 
   return (
@@ -57,7 +75,7 @@ export function GameTable({
         waiting && "cursor-pointer"
       )}
     >
-      <header className="pointer-events-none absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.5rem,env(safe-area-inset-right))] left-[max(3.25rem,env(safe-area-inset-left))] z-20 flex items-start justify-between gap-4 text-white/80 md:left-4">
+      <header className="pointer-events-none absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.5rem,env(safe-area-inset-right))] left-[max(3.25rem,env(safe-area-inset-left))] z-20 flex items-start justify-between gap-4 text-white/80 md:left-0 md:pl-[var(--header-left-pad,0.75rem)]">
         <div className="hidden min-w-0 md:block">
           <TitleEditor title={displayGameTitle(state.title)} onRename={onRename} />
           <p className="max-w-md text-xs text-white/55">{rulesLine(state.settings)}</p>
@@ -65,24 +83,24 @@ export function GameTable({
         <CopyLink code={code} />
       </header>
 
-      {state.trump && motion.trumpPhase !== "hidden" && (
+      {trumpCard && (
         <TrumpSpot
-          card={state.trump}
-          phase={motion.trumpPhase}
+          card={trumpCard}
+          phase={motion.trumpPhase as Exclude<typeof motion.trumpPhase, "hidden">}
         />
       )}
 
       <TrickPile
         plays={motion.trick}
         leaving={motion.trickLeaving}
-        winnerSeat={motion.trickWinnerSeat ?? trickWinnerSeat}
+        winnerSeat={trickWinnerSeat}
         mySeat={anchor}
         seatCount={count}
-        highlightWinner={state.phase === "trick-end" && !motion.trickLeaving}
-        takenByUs={
-          mySeat === null ||
-          (motion.trickWinnerSeat ?? trickWinnerSeat) === mySeat
+        highlightWinner={
+          (state.phase === "trick-end" || state.phase === "round-end") &&
+          !motion.trickLeaving
         }
+        takenByUs={mySeat === null || trickWinnerSeat === mySeat}
       />
 
       {state.seats.map((seat) => {
@@ -98,9 +116,19 @@ export function GameTable({
             self={self}
             spectating={spectating}
             online={seat.playerId ? onlineIds.includes(seat.playerId) : false}
-            revealCount={motion.dealing ? motion.revealed[seat.index] : undefined}
+            revealCount={
+              motion.dealing || motion.enteringDeal
+                ? motion.dealing
+                  ? motion.revealed[seat.index]
+                  : 0
+                : undefined
+            }
             dealing={motion.dealing}
             wonTrick={trickWinnerSeat === seat.index}
+            canManageBots={canManageBots}
+            onMakeBot={onMakeBot}
+            onRemoveBot={onRemoveBot}
+            onSwapSeats={onSwapSeats}
             onPlay={
               self && state.phase === "playing" && !motion.dealing
                 ? onPlay

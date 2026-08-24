@@ -53,7 +53,7 @@ export function TrumpSpot({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] flex flex-col items-center",
+        "pointer-events-none fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(calc(0.75rem+var(--sidebar-offset,0rem)),env(safe-area-inset-left))] flex flex-col items-center",
         phase === "rest" ? "z-20" : "z-40",
         clearing && "table-clear"
       )}

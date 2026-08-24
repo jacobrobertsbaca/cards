@@ -6,12 +6,15 @@ import {
   createGame,
   joinGame,
   legalBids,
+  makeBot,
   placeBid,
   playCard,
+  removeBot,
   isLegalPlay,
   wouldBeLegalPlay,
   renameGame,
   startGame,
+  swapSeats,
 } from "./engine"
 import { evaluateFormula } from "./formula"
 import type { GameSettings } from "./types"
@@ -51,6 +54,46 @@ describe("oh hell", () => {
     assert.equal(state.phase, "bidding")
     assert.equal(state.hands.every((hand) => hand.length === 1), true)
     assert.ok(state.trump)
+  })
+
+  it("fills empty seats with bots before start", () => {
+    let state = createGame(settings())
+    state = joinGame(state, "a", "Ada")
+    state = makeBot(state, 1)
+    state = makeBot(state, 2)
+    assert.equal(state.seats[1].isBot, true)
+    assert.equal(state.seats[2].isBot, true)
+    state = removeBot(state, 1)
+    assert.equal(state.seats[1].playerId, null)
+    state = makeBot(state, 1)
+    state = startGame(state)
+    assert.equal(state.phase, "bidding")
+  })
+
+  it("swaps seated players in the lobby", () => {
+    let state = createGame(settings())
+    state = joinGame(state, "a", "Ada")
+    state = joinGame(state, "b", "Bea")
+    state = makeBot(state, 2)
+    state = swapSeats(state, "a", 1)
+    assert.equal(state.seats[0].playerId, "b")
+    assert.equal(state.seats[1].playerId, "a")
+    assert.equal(state.seats[2].isBot, true)
+    assert.match(state.seats[2].playerId ?? "", /^bot:2$/)
+    state = swapSeats(state, "a", 2)
+    assert.equal(state.seats[1].isBot, true)
+    assert.match(state.seats[1].playerId ?? "", /^bot:1$/)
+    assert.equal(state.seats[2].playerId, "a")
+    assert.equal(state.seats[2].isBot, false)
+  })
+
+  it("moves a player into an empty seat in the lobby", () => {
+    let state = createGame(settings())
+    state = joinGame(state, "a", "Ada")
+    state = swapSeats(state, "a", 2)
+    assert.equal(state.seats[0].playerId, null)
+    assert.equal(state.seats[2].playerId, "a")
+    assert.equal(state.seats[2].displayName, "Ada")
   })
 
   it("hooks the dealer off the exact total", () => {
@@ -108,16 +151,13 @@ describe("oh hell", () => {
     const follower = state.currentSeat!
     const follow = state.hands[follower][0]
     state = playCard(state, follower, follow)
-    assert.equal(state.phase, "trick-end")
+    assert.equal(state.phase, "game-over")
     assert.equal(state.currentTrick.length, 0)
     assert.equal(state.lastTrick.length, 2)
-    assert.equal(isLegalPlay(state, state.trickLeader, state.hands[state.trickLeader][0] ?? led), false)
     assert.deepEqual(
       state.lastTrick.map((play) => play.card),
       [led, follow]
     )
-    state = continueTrick(state)
-    assert.equal(state.phase, "game-over")
   })
 
   it("waits for continue before the next trick", () => {

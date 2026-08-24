@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { armAudio, playDeal, playDing, playShuffle } from "@/lib/audio"
 import { cardsThisRound, trickWinner } from "@/lib/game/engine"
 import type { GameState, TrickPlay } from "@/lib/game/types"
@@ -13,6 +13,8 @@ export const TRUMP_FLIP_MS = 380
 const TRUMP_SHOW_MS = 120
 const TRUMP_HOLD_MS = 420
 const TRUMP_FLY_MS = 480
+const TRICK_CLEAR_MS = 420
+const POST_CLEAR_PAUSE_MS = 450
 
 const SLOT_OFFSET: Record<TableSlot, { x: string; y: string }> = {
   south: { x: "0vw", y: "38vh" },
@@ -72,6 +74,10 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
   const [trickLeaving, setTrickLeaving] = useState(false)
   const [trickWinnerSeat, setTrickWinnerSeat] = useState<number | null>(null)
 
+  const enteringDeal =
+    state.phase === "bidding" &&
+    (prevPhase.current === "lobby" || prevPhase.current === "round-end")
+
   useEffect(() => {
     armAudio()
   }, [])
@@ -93,12 +99,18 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     }
   }, [mySeat, state])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const from = prevPhase.current
-    prevPhase.current = state.phase
     const started =
       state.phase === "bidding" && (from === "lobby" || from === "round-end")
+
+    prevPhase.current = state.phase
     if (!started) return
+
+    const timers: number[] = []
+    const later = (fn: () => void, ms: number) => {
+      timers.push(window.setTimeout(fn, ms))
+    }
 
     const count = state.settings.seatCount
     const cards = cardsThisRound(state)
@@ -110,15 +122,12 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
       }
     }
     const hasTrump = state.trump !== null
-
     const fullHands = state.hands.map((hand) => hand.length)
+    const fromRoundEnd = from === "round-end"
+
     setDealing(true)
     setTrumpPhase("hidden")
     setRevealed(state.seats.map(() => 0))
-    const timers: number[] = []
-    const later = (fn: () => void, ms: number) => {
-      timers.push(window.setTimeout(fn, ms))
-    }
 
     const held = shownTrick.current.length > 0
     if (held) {
@@ -129,13 +138,16 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
         setTrick([])
         setTrickLeaving(false)
         setTrickWinnerSeat(null)
-      }, 420)
+      }, TRICK_CLEAR_MS)
     } else {
       setTrick([])
       setTrickLeaving(false)
     }
 
-    const startAt = held ? 420 : 0
+    const clearAt = held ? TRICK_CLEAR_MS : 0
+    const pauseBeforeDeal =
+      fromRoundEnd && !prefersReducedMotion() ? POST_CLEAR_PAUSE_MS : 0
+    const dealStartAt = clearAt + pauseBeforeDeal
     const finishDeal = (animateTrump: boolean) => {
       setRevealed(fullHands)
       if (!hasTrump) {
@@ -167,15 +179,15 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
       later(() => {
         playShuffle()
         finishDeal(false)
-      }, startAt)
+      }, dealStartAt)
       return () => timers.forEach((timer) => window.clearTimeout(timer))
     }
 
     later(() => {
       setShuffling(true)
       playShuffle()
-    }, startAt)
-    later(() => setShuffling(false), startAt + 520)
+    }, dealStartAt)
+    later(() => setShuffling(false), dealStartAt + 520)
 
     const budget = 2800
     const flightMs = 380
@@ -189,12 +201,17 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
       later(() => {
         playDeal()
         setRevealed((current) =>
-          current.map((value, index) => (index === seat ? value + 1 : value))
+          current.map((value, seatIndex) =>
+            seatIndex === seat ? value + 1 : value
+          )
         )
-      }, startAt + 520 + index * stagger)
+      }, dealStartAt + 520 + index * stagger)
     })
 
-    later(() => finishDeal(true), startAt + 520 + queue.length * stagger + flightMs + 60)
+    later(
+      () => finishDeal(true),
+      dealStartAt + 520 + queue.length * stagger + flightMs + 60
+    )
 
     return () => timers.forEach((timer) => window.clearTimeout(timer))
   }, [mySeat, state.dealer, state.phase, state.roundIndex, state.settings.seatCount])
@@ -215,7 +232,11 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
       setTrick(plays)
       setTrickLeaving(false)
       setTrickWinnerSeat(
-        state.phase === "trick-end" ? trickWinner(plays, state.trump) : null
+        state.phase === "trick-end" ||
+          state.phase === "round-end" ||
+          state.phase === "game-over"
+          ? trickWinner(plays, state.trump)
+          : null
       )
       return
     }
@@ -262,6 +283,7 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     trick,
     trickLeaving,
     trickWinnerSeat,
+    enteringDeal,
   }
 }
 

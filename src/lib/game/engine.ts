@@ -1,5 +1,6 @@
 import { createDeck, sameCard, shuffle, sortHand, rankValue } from "./cards"
 import { evaluateFormula } from "./formula"
+import { randomName } from "../names"
 import { validatePattern } from "./pattern"
 import { defaultGameTitle } from "./title"
 import type { Card, GameSettings, GameState, TrickPlay } from "./types"
@@ -33,6 +34,7 @@ export function createGame(settings: GameSettings): GameState {
       index,
       playerId: null,
       displayName: null,
+      isBot: false,
     })),
     dealer: 0,
     roundIndex: 0,
@@ -70,7 +72,73 @@ export function joinGame(
 
   open.playerId = playerId
   open.displayName = displayName
+  open.isBot = false
 
+  return next
+}
+
+export function makeBot(state: GameState, seatIndex: number): GameState {
+  if (state.phase !== "lobby") throw new GameError("The game has already started")
+  const next = clone(state)
+  const seat = next.seats[seatIndex]
+  if (!seat) throw new GameError("Invalid seat")
+  if (seat.playerId) throw new GameError("That seat is taken")
+
+  seat.playerId = `bot:${seatIndex}`
+  seat.displayName = randomName()
+  seat.isBot = true
+  return next
+}
+
+export function removeBot(state: GameState, seatIndex: number): GameState {
+  if (state.phase !== "lobby") throw new GameError("The game has already started")
+  const next = clone(state)
+  const seat = next.seats[seatIndex]
+  if (!seat?.isBot) throw new GameError("That seat is not a bot")
+
+  seat.playerId = null
+  seat.displayName = null
+  seat.isBot = false
+  return next
+}
+
+export function swapSeats(
+  state: GameState,
+  playerId: string,
+  targetSeatIndex: number
+): GameState {
+  if (state.phase !== "lobby") throw new GameError("The game has already started")
+  const next = clone(state)
+  const from = next.seats.find((seat) => seat.playerId === playerId)
+  const to = next.seats[targetSeatIndex]
+  if (!from) throw new GameError("You are not seated")
+  if (!to) throw new GameError("Invalid seat")
+  if (from.index === targetSeatIndex) throw new GameError("That is your seat")
+
+  if (!to.playerId) {
+    to.playerId = from.playerId
+    to.displayName = from.displayName
+    to.isBot = from.isBot
+    from.playerId = null
+    from.displayName = null
+    from.isBot = false
+  } else {
+    const saved = {
+      playerId: from.playerId,
+      displayName: from.displayName,
+      isBot: from.isBot,
+    }
+    from.playerId = to.playerId
+    from.displayName = to.displayName
+    from.isBot = to.isBot
+    to.playerId = saved.playerId
+    to.displayName = saved.displayName
+    to.isBot = saved.isBot
+  }
+
+  for (const seat of next.seats) {
+    if (seat.isBot) seat.playerId = `bot:${seat.index}`
+  }
   return next
 }
 
@@ -197,6 +265,9 @@ export function playCard(state: GameState, seat: number, card: Card): GameState 
   next.currentTrick = []
   next.trickLeader = winner
   next.currentSeat = winner
+  if (next.hands.every((hand) => hand.length === 0)) {
+    return scoreRound(next)
+  }
   next.phase = "trick-end"
   return next
 }

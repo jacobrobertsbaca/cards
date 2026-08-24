@@ -141,7 +141,11 @@ export function CardFan({
         return (
           <div
             key={key}
-            className="absolute bottom-0 left-1/2 origin-bottom transition-transform duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+            className={cn(
+              "absolute bottom-0 left-1/2 origin-bottom",
+              !dealing &&
+                "transition-transform duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+            )}
             style={{
               transform: `translateX(calc(-50% + ${pose.x}px)) translateY(${pose.y - pose.depth}px) rotate(${pose.rotate}deg)`,
               zIndex: index,

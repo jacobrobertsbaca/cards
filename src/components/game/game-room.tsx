@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useGame } from "@/hooks/use-game"
+import { useBotController } from "@/hooks/use-bot-controller"
 import { useContinuePrompt } from "@/hooks/use-continue-prompt"
 import { useGameOverPrompt } from "@/hooks/use-game-over-prompt"
 import { useJoinPrompt } from "@/hooks/use-join-prompt"
@@ -14,13 +15,16 @@ import {
   filledSeats,
   isLegalPlay,
   joinGame,
+  makeBot,
   placeBid,
   playCard,
+  removeBot,
   renameGame,
   renameSeat,
   seatForPlayer,
   startGame,
   startRound,
+  swapSeats,
 } from "@/lib/game/engine"
 import { displayGameTitle } from "@/lib/game/title"
 import { rememberGame } from "@/lib/history"
@@ -180,6 +184,30 @@ export function GameRoom({ code }: { code: string }) {
     }
   }
 
+  async function onMakeBot(seatIndex: number) {
+    try {
+      await apply((current) => makeBot(current, seatIndex))
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not add bot")
+    }
+  }
+
+  async function onRemoveBot(seatIndex: number) {
+    try {
+      await apply((current) => removeBot(current, seatIndex))
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not remove bot")
+    }
+  }
+
+  async function onSwapSeats(targetSeatIndex: number) {
+    try {
+      await apply((current) => swapSeats(current, identity.id, targetSeatIndex))
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not change places")
+    }
+  }
+
   if (status === "loading") {
     return (
       <div className="flex h-full items-center justify-center text-sm text-white/60">
@@ -209,6 +237,7 @@ export function GameRoom({ code }: { code: string }) {
     <ReadyTable
       code={code}
       state={state}
+      version={record?.version}
       mySeatIndex={mySeat?.index ?? null}
       role={role}
       online={online}
@@ -221,6 +250,10 @@ export function GameRoom({ code }: { code: string }) {
       onAdvanceTrick={() => void onAdvanceTrick()}
       onContinue={() => void onContinue()}
       onRename={(title) => void onRename(title)}
+      onMakeBot={(seatIndex) => void onMakeBot(seatIndex)}
+      onRemoveBot={(seatIndex) => void onRemoveBot(seatIndex)}
+      onSwapSeats={(seatIndex) => void onSwapSeats(seatIndex)}
+      apply={apply}
     />
   )
 }
@@ -228,6 +261,7 @@ export function GameRoom({ code }: { code: string }) {
 function ReadyTable({
   code,
   state,
+  version,
   mySeatIndex,
   role,
   online,
@@ -240,9 +274,14 @@ function ReadyTable({
   onAdvanceTrick,
   onContinue,
   onRename,
+  onMakeBot,
+  onRemoveBot,
+  onSwapSeats,
+  apply,
 }: {
   code: string
   state: GameState
+  version: number | undefined
   mySeatIndex: number | null
   role: "player" | "spectator" | "unknown"
   online: string[]
@@ -255,6 +294,10 @@ function ReadyTable({
   onAdvanceTrick: () => void
   onContinue: () => void
   onRename: (title: string) => void
+  onMakeBot: (seatIndex: number) => void
+  onRemoveBot: (seatIndex: number) => void
+  onSwapSeats: (seatIndex: number) => void
+  apply: (mutate: (current: GameState) => GameState) => Promise<unknown>
 }) {
   const seated = mySeatIndex !== null
   const showJoin =
@@ -263,11 +306,16 @@ function ReadyTable({
   const showLobbyReady =
     state.phase === "lobby" && tableFull && role !== "unknown"
   const motion = useTableMotion(state, mySeatIndex)
+  const biddingReady =
+    !motion.dealing &&
+    !motion.enteringDeal &&
+    (motion.trumpPhase === "rest" || motion.trumpPhase === "hidden")
   const myTurnToBid =
     seated &&
     state.phase === "bidding" &&
     state.currentSeat === mySeatIndex &&
-    !motion.dealing
+    state.bids[mySeatIndex] === null &&
+    biddingReady
   const showRoundEnd = state.phase === "round-end" && role !== "unknown"
   const lastRound = state.history[state.history.length - 1]
   const waitingToContinue =
@@ -301,6 +349,7 @@ function ReadyTable({
     active: state.phase === "game-over",
     state,
   })
+  useBotController(state, version, mySeatIndex, apply)
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -313,6 +362,10 @@ function ReadyTable({
         motion={motion}
         onPlay={onPlay}
         onRename={onRename}
+        canManageBots={role === "player" && state.phase === "lobby"}
+        onMakeBot={onMakeBot}
+        onRemoveBot={onRemoveBot}
+        onSwapSeats={onSwapSeats}
       />
       {myTurnToBid && mySeatIndex !== null && (
         <BidPanel state={state} seat={mySeatIndex} onBid={onBid} />

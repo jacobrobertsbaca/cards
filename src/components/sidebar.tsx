@@ -20,46 +20,122 @@ import { historyTooltip } from "@/lib/game/rules"
 import { forgetGame } from "@/lib/history"
 import { setDisplayName } from "@/lib/identity"
 import { cn } from "@/lib/utils"
+import { SidebarToggleIcon } from "@/components/sidebar-toggle-icon"
 
-const RAIL = "w-10"
-const TILE =
-  "flex size-6 shrink-0 items-center justify-center rounded-md"
+export const SIDEBAR_WIDTH = "w-56"
+export const SIDEBAR_EXPANDED_INSET = "14rem"
+export const SIDEBAR_RAIL_INSET = "2.5rem"
+export const SIDEBAR_HOVER_TRIGGER = "w-2.5"
+const ROW_HOVER =
+  "rounded-md transition-colors hover:bg-white/10 active:bg-white/15"
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/40"
 
 export function AppSidebar({
   mobileOpen,
   onMobileOpenChange,
+  pinned,
+  onPinnedChange,
 }: {
   mobileOpen: boolean
   onMobileOpenChange: (open: boolean) => void
+  pinned: boolean
+  onPinnedChange: (pinned: boolean) => void
 }) {
   const [hovered, setHovered] = useState(false)
-  const expanded = hovered
+  const expanded = pinned || hovered
+
+  function togglePinned() {
+    onPinnedChange(!pinned)
+  }
+
+  function closeHover() {
+    if (!pinned) setHovered(false)
+  }
 
   return (
     <>
-      <aside
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+      <div
+        onMouseEnter={expanded ? () => setHovered(true) : undefined}
+        onMouseLeave={closeHover}
         className={cn(
-          "fixed top-0 left-0 z-40 hidden h-svh isolate overflow-hidden border-r border-white/10 bg-[#10261d] text-white transition-[width] duration-200 ease-out md:flex",
-          expanded ? "w-64" : RAIL
+          "fixed top-0 left-0 z-40 hidden h-svh overflow-hidden md:block",
+          "transition-[width] duration-200 ease-out",
+          expanded ? SIDEBAR_WIDTH : "pointer-events-none w-10"
         )}
       >
-        <div className="flex h-full w-64 min-w-0 shrink-0 flex-col overflow-hidden">
-          <SidebarBody expanded={expanded} />
+        {!expanded && (
+          <div
+            aria-hidden
+            className={cn(
+              "pointer-events-auto absolute inset-y-0 left-0 z-10",
+              SIDEBAR_HOVER_TRIGGER
+            )}
+            onMouseEnter={() => setHovered(true)}
+          />
+        )}
+        <div
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-0 border-r border-white/10 bg-[#10261d] shadow-2xl shadow-black/40 transition-opacity duration-200 ease-out",
+            expanded ? "opacity-100" : "opacity-0"
+          )}
+        />
+
+        <div className="relative flex h-full w-56 flex-col text-white">
+          <div
+            className={cn(
+              "flex w-10 shrink-0 justify-center p-1",
+              !expanded && "pointer-events-auto"
+            )}
+            onMouseEnter={!expanded ? () => setHovered(true) : undefined}
+          >
+            <button
+              type="button"
+              onClick={togglePinned}
+              aria-label={pinned ? "Unpin sidebar" : "Pin sidebar open"}
+              aria-expanded={expanded}
+              className={cn(
+                "relative z-20 flex size-8 items-center justify-center rounded-md text-white/70 hover:text-white",
+                ROW_HOVER,
+                FOCUS_RING
+              )}
+            >
+              <SidebarToggleIcon pinned={pinned} />
+            </button>
+          </div>
+
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col overflow-hidden transition-opacity duration-150 ease-out",
+              expanded
+                ? "opacity-100 delay-75"
+                : "pointer-events-none opacity-0 delay-0"
+            )}
+          >
+            <SidebarBody
+              expanded={expanded}
+              onNavigate={() => {
+                onMobileOpenChange(false)
+                closeHover()
+              }}
+            />
+          </div>
         </div>
-      </aside>
+      </div>
 
       <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
         <SheetContent
           side="left"
-          className="w-72 border-white/10 bg-[#10261d] p-0 text-white"
-          showCloseButton
+          className="w-72 border-white/10 bg-[#10261d] p-0 pt-[max(0.75rem,env(safe-area-inset-top))] text-white"
+          showCloseButton={false}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Menu</SheetTitle>
           </SheetHeader>
-          <SidebarBody expanded onNavigate={() => onMobileOpenChange(false)} />
+          <div className="pt-2">
+            <SidebarBody expanded onNavigate={() => onMobileOpenChange(false)} />
+          </div>
         </SheetContent>
       </Sheet>
     </>
@@ -84,23 +160,24 @@ function SidebarBody({
   }
 
   return (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden">
-      <div className="overflow-hidden pt-2.5">
+    <div className="flex h-full min-w-0 flex-col">
+      <div className="px-1.5 py-0.5">
         <SidebarRow
           href="/"
           active={pathname === "/"}
-          icon={<Plus className="size-3.5" />}
+          icon={<Plus className="size-3" />}
           label="New game"
           expanded={expanded}
           onNavigate={onNavigate}
         />
-        <div className="flex w-10 justify-center py-1.5">
-          <div className="h-px w-5 bg-white/20" />
-        </div>
       </div>
 
-      <ScrollArea className="min-w-0 flex-1 overflow-hidden pb-3">
-        <div className="overflow-hidden">
+      <div className="py-1.5">
+        <div className="h-px bg-white/15" />
+      </div>
+
+      <ScrollArea className="min-w-0 flex-1 px-1.5 pb-2">
+        <div className="py-0.5">
           {games.map((game) => {
             const title = displayGameTitle(game.title, game.startedAt)
             return (
@@ -109,7 +186,7 @@ function SidebarBody({
                 href={`/${game.code}`}
                 active={pathname === `/${game.code}`}
                 icon={
-                  <span className="text-[10px] font-medium opacity-70">
+                  <span className="text-[9px] font-medium opacity-70">
                     {title.slice(0, 1)}
                   </span>
                 }
@@ -124,7 +201,11 @@ function SidebarBody({
         </div>
       </ScrollArea>
 
-      <div className="overflow-hidden border-t border-white/10">
+      <div className="py-1.5">
+        <div className="h-px bg-white/15" />
+      </div>
+
+      <div className="px-1.5 pb-1.5">
         <NameEditor name={identity.name} expanded={expanded} />
       </div>
     </div>
@@ -151,28 +232,35 @@ function SidebarRow({
   onRemove?: () => void
 }) {
   return (
-    <div className="group/row flex h-9 w-full min-w-0 items-center overflow-hidden text-sm transition-colors hover:bg-white/5">
+    <div className="group/row relative flex min-w-0 items-center">
       <Link
         href={href}
         onClick={onNavigate}
         title={expanded ? undefined : title}
-        className="flex h-full min-w-0 flex-1 items-center overflow-hidden"
-      >
-        <span className="flex w-10 shrink-0 items-center justify-center">
-          <span className={cn(TILE, active && "bg-white/15")}>{icon}</span>
-        </span>
-        {expanded && (
-          <span className="min-w-0 flex-1 truncate">{label}</span>
+        className={cn(
+          "flex h-8 min-w-0 flex-1 items-center gap-1.5 px-1.5 text-[13px] leading-none",
+          onRemove && "pr-7",
+          ROW_HOVER,
+          FOCUS_RING,
+          active && "bg-white/15"
         )}
+      >
+        <span className="flex size-5 shrink-0 items-center justify-center">
+          {icon}
+        </span>
+        {expanded && <span className="min-w-0 flex-1 truncate">{label}</span>}
       </Link>
       {expanded && onRemove && (
         <button
           type="button"
           aria-label={`Remove ${label}`}
           onClick={onRemove}
-          className="mr-1.5 flex size-6 shrink-0 items-center justify-center rounded-md text-white/45 opacity-70 transition-opacity hover:bg-white/10 hover:text-white md:opacity-0 md:group-hover/row:opacity-100"
+          className={cn(
+            "absolute right-1.5 flex size-5 shrink-0 items-center justify-center rounded-md text-white/45 opacity-70 transition-opacity hover:bg-white/10 hover:text-white md:opacity-0 md:group-hover/row:opacity-100",
+            FOCUS_RING
+          )}
         >
-          <X className="size-3.5" />
+          <X className="size-3" />
         </button>
       )}
     </div>
@@ -197,16 +285,14 @@ function NameEditor({
   if (editing) {
     return (
       <form
-        className="flex h-9 min-w-0 items-center gap-1 overflow-hidden pr-2"
+        className="flex h-8 min-w-0 items-center gap-1 overflow-hidden"
         onSubmit={(event) => {
           event.preventDefault()
           save()
         }}
       >
-        <span className="flex w-10 shrink-0 items-center justify-center">
-          <span className={cn(TILE, "bg-white/10 text-[10px] font-medium")}>
-            {initials(name)}
-          </span>
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-white/10 text-[9px] font-medium">
+          {initials(name)}
         </span>
         <Input
           value={draft ?? ""}
@@ -214,7 +300,7 @@ function NameEditor({
           maxLength={24}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={save}
-          className="h-8 border-white/10 bg-white/5 text-white"
+          className="h-7 border-white/10 bg-white/5 text-[13px] text-white"
         />
         <Button type="submit" size="icon-sm" variant="ghost">
           <Check />
@@ -229,17 +315,19 @@ function NameEditor({
       onClick={() => {
         if (expanded) setDraft(name)
       }}
-      className="flex h-9 w-full min-w-0 items-center overflow-hidden text-left text-sm transition-colors hover:bg-white/5"
+      className={cn(
+        "flex h-8 w-full min-w-0 items-center gap-1.5 px-1.5 text-left text-[13px] leading-none",
+        ROW_HOVER,
+        FOCUS_RING
+      )}
     >
-      <span className="flex w-10 shrink-0 items-center justify-center">
-        <span className={cn(TILE, "bg-white/10 text-[10px] font-medium")}>
-          {initials(name)}
-        </span>
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-white/10 text-[9px] font-medium">
+        {initials(name)}
       </span>
       {expanded && (
         <>
           <span className="min-w-0 flex-1 truncate">{name || "…"}</span>
-          <Pencil className="mr-3 size-3.5 shrink-0 opacity-40" />
+          <Pencil className="size-3 shrink-0 opacity-40" />
         </>
       )}
     </button>

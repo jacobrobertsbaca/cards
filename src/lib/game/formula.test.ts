@@ -45,7 +45,8 @@ describe("scoring formula", () => {
   })
 
   it("pretty-prints math", () => {
-    assert.equal(prettyExpression("10+t"), "10 + t")
+    assert.equal(prettyExpression("10+t"), "10+t")
+    assert.equal(prettyExpression("10 + t"), "10+t")
     assert.equal(prettyExpression("10*t"), "10t")
     assert.equal(prettyExpression("t^2"), "t^2")
     assert.equal(prettyExpression("10**2"), "10^2")

@@ -174,11 +174,9 @@ function prettyFromTokens(tokens: string[]) {
       continue
     }
     const shown = token === "-" ? "−" : token === "*" ? "·" : token
-    const pad = shown === "+" || shown === "−" || shown === "·"
-    if (pad) text += ` ${shown} `
-    else text += shown
+    text += shown
   }
-  return text.replace(/\s+/g, " ").trim()
+  return text
 }
 
 export function prettyExpression(expression: string) {

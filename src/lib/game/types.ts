@@ -43,6 +43,7 @@ export type Seat = {
   index: number
   playerId: string | null
   displayName: string | null
+  isBot: boolean
 }
 
 export type Phase =
@@ -87,7 +88,7 @@ export type GameState = {
 }
 
 export const DEFAULT_FORMULA: ScoringFormula = {
-  made: "10 + t",
+  made: "10+t",
   miss: "t",
 }
 

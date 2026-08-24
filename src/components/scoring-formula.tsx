@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
-const MATH = "whitespace-pre font-serif text-[1.05rem] leading-snug not-italic"
+const MATH =
+  "whitespace-nowrap font-mono text-sm tabular-nums leading-snug tracking-tight not-italic"
 
 export function ScoringFormulaEditor({
   value,
@@ -28,27 +29,27 @@ export function ScoringFormulaEditor({
   return (
     <div className="rounded-lg border border-white/15 bg-[linear-gradient(180deg,rgb(255_255_255/0.07),rgb(255_255_255/0.03))] shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]">
       <div className="flex items-center gap-2 px-3.5 py-2.5">
-        <div className="flex shrink-0 items-baseline gap-1.5 font-serif text-[1.05rem] leading-none text-white/85 not-italic">
-          <span>Score</span>
-          <span className="text-white/30">=</span>
+        <div className="flex shrink-0 items-baseline gap-1.5 text-sm leading-none text-white/85">
+          <span className="font-medium">Score</span>
+          <span className="font-mono text-white/30">=</span>
         </div>
         <div className="flex min-w-0 flex-1 items-stretch gap-1.5">
           <SquareBrace />
-          <div className="min-w-0 flex-1">
+          <div className="grid min-w-0 flex-1 grid-cols-[max-content_minmax(0,1fr)] grid-rows-2 items-center gap-x-3">
             <ScoringRow
-              label="on made bid"
               value={value.made}
-              placeholder="10 + t"
+              placeholder="10+t"
               ariaLabel="Score when bid is made"
               onChange={(made) => onChange({ ...value, made })}
             />
+            <CaseLabel>on made bid</CaseLabel>
             <ScoringRow
-              label="on missed bid"
               value={value.miss}
               placeholder="t"
               ariaLabel="Score when bid is missed"
               onChange={(miss) => onChange({ ...value, miss })}
             />
+            <CaseLabel>on missed bid</CaseLabel>
           </div>
         </div>
       </div>
@@ -57,13 +58,11 @@ export function ScoringFormulaEditor({
 }
 
 function ScoringRow({
-  label,
   value,
   placeholder,
   ariaLabel,
   onChange,
 }: {
-  label: string
   value: string
   placeholder: string
   ariaLabel: string
@@ -72,7 +71,7 @@ function ScoringRow({
   const error = validateExpression(value)
 
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-0.5">
+    <div className="flex min-h-6 items-center py-0.5">
       <MathField
         value={value}
         ariaLabel={ariaLabel}
@@ -81,10 +80,15 @@ function ScoringRow({
         error={error}
         onChange={onChange}
       />
-      <span className="shrink-0 font-serif text-[0.85rem] text-white/35">
-        {label}
-      </span>
     </div>
+  )
+}
+
+function CaseLabel({ children }: { children: string }) {
+  return (
+    <span className="flex min-h-6 w-full items-center justify-end py-0.5 text-right text-xs whitespace-nowrap text-white/35">
+      {children}
+    </span>
   )
 }
 
@@ -121,11 +125,11 @@ function MathLine({
     <span className={cn("flex items-baseline", MATH, className)}>
       {tokens.map((token, index) =>
         token.kind === "var" ? (
-          <span key={`${token.name}-${index}`} className="italic text-amber-100/90">
+          <span key={`${token.name}-${index}`} className="italic text-amber-200/90">
             {token.name}
           </span>
         ) : (
-          <span key={index} className="text-white/80">
+          <span key={index} className="text-white/85">
             {token.value}
           </span>
         )
@@ -234,7 +238,7 @@ function MathField({
         />
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        <span className="font-serif italic">t</span>
+        <span className="font-mono italic">t</span>
         {" is the number of tricks made"}
       </TooltipContent>
     </Tooltip>
