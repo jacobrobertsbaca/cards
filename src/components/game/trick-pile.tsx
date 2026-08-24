@@ -1,10 +1,11 @@
 "use client"
 
-import type { CSSProperties } from "react"
+import { useRef, type CSSProperties } from "react"
 import { dealOffset, exitOffset } from "@/hooks/use-table-motion"
 import type { TrickPlay } from "@/lib/game/types"
 import { cn } from "@/lib/utils"
 import { slotFor } from "./player-seat"
+import { usePlayOrigin, type PlayOrigin } from "./play-origin"
 import { PlayingCard } from "./playing-card"
 
 const STACK = [
@@ -14,6 +15,10 @@ const STACK = [
   { ox: "14px", oy: "6px", tilt: "5deg" },
   { ox: "2px", oy: "-4px", tilt: "-6deg" },
 ]
+
+function playKey(play: TrickPlay) {
+  return `${play.seat}-${play.card.rank}${play.card.suit}`
+}
 
 export function TrickPile({
   plays,
@@ -32,7 +37,20 @@ export function TrickPile({
   highlightWinner?: boolean
   takenByUs?: boolean
 }) {
-  if (plays.length === 0) return null
+  const origins = usePlayOrigin()
+  const captured = useRef(new Map<string, PlayOrigin>())
+  const last = plays[plays.length - 1]
+  if (last && !leaving) {
+    const key = playKey(last)
+    if (!captured.current.has(key)) {
+      const origin = origins?.take(last.seat)
+      if (origin) captured.current.set(key, origin)
+    }
+  }
+  if (plays.length === 0) {
+    captured.current.clear()
+    return null
+  }
   const winnerSlot =
     winnerSeat !== null
       ? slotFor(seatCount, (winnerSeat - mySeat + seatCount) % seatCount)
@@ -48,10 +66,11 @@ export function TrickPile({
           (play.seat - mySeat + seatCount) % seatCount
         )
         const from = dealOffset(fromSlot)
+        const origin = captured.current.get(playKey(play))
         const won = Boolean(highlightWinner) && winnerSeat === play.seat && !leaving
         return (
           <div
-            key={`${play.card.rank}${play.card.suit}${play.seat}`}
+            key={playKey(play)}
             className={cn(
               "absolute trick-rest",
               leaving
@@ -60,8 +79,10 @@ export function TrickPile({
             )}
             style={
               {
-                "--from-x": from.x,
-                "--from-y": from.y,
+                "--from-x": origin ? `${origin.x}px` : from.x,
+                "--from-y": origin ? `${origin.y}px` : from.y,
+                "--from-scale": origin?.scale ?? 0.85,
+                "--from-tilt": origin?.tilt ?? stack.tilt,
                 "--ox": stack.ox,
                 "--oy": stack.oy,
                 "--tilt": stack.tilt,

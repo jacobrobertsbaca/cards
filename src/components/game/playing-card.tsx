@@ -1,6 +1,8 @@
 "use client"
 
+import { type ReactNode } from "react"
 import { SUIT_GLYPH } from "@/lib/game/cards"
+import { useArrivingIndex, useDealIn } from "@/hooks/use-deal-in"
 import type { Card } from "@/lib/game/types"
 import { cn } from "@/lib/utils"
 import { FAN_CARD, fanPose } from "./fan"
@@ -13,11 +15,16 @@ const SIZES = {
   xl: "w-[6rem] h-[8.4rem] text-base rounded-xl",
 }
 
+function ArmRing() {
+  return <span className="card-arm-ring" aria-hidden />
+}
+
 export function PlayingCard({
   card,
   faceDown = false,
   size = "md",
   selected = false,
+  armed = false,
   disabled = false,
   onClick,
   className,
@@ -26,6 +33,7 @@ export function PlayingCard({
   faceDown?: boolean
   size?: keyof typeof SIZES
   selected?: boolean
+  armed?: boolean
   disabled?: boolean
   onClick?: () => void
   className?: string
@@ -45,12 +53,13 @@ export function PlayingCard({
           ? "border-[#1b2a4a] bg-[#243868] card-back"
           : "border-black/5 bg-[#fbfaf6]",
         onClick && !disabled && "[@media(hover:hover)]:hover:-translate-y-2 [@media(hover:hover)]:hover:shadow-lg",
-        selected &&
-          "border-transparent ring-[3px] ring-amber-300 [@media(hover:hover)]:ring-2 [@media(hover:hover)]:ring-white/80",
+        selected && !armed && "border-transparent ring-[3px] ring-amber-300",
+        armed && "border-transparent",
         disabled && "brightness-[0.55] saturate-50",
         className
       )}
     >
+      {armed && <ArmRing />}
       {faceDown || !card ? (
         <div className="absolute inset-[3px] rounded-[inherit] border border-white/15" />
       ) : (
@@ -88,20 +97,38 @@ export function PlayingCard({
   )
 }
 
+export function DealIn({ active, children }: { active: boolean; children: ReactNode }) {
+  const ref = useDealIn(active)
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "inline-block [transform-origin:center]",
+        active && "relative z-20"
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
 export function CardFan({
   count,
   cards,
   faceDown,
   size = "sm",
   rotate = 0,
+  dealing = false,
 }: {
   count?: number
   cards?: Card[]
   faceDown?: boolean
   size?: keyof typeof SIZES
   rotate?: number
+  dealing?: boolean
 }) {
   const items = cards ?? Array.from({ length: count ?? 0 })
+  const arriving = useArrivingIndex(items.length, dealing)
   const spec = FAN_CARD[size]
   const sample = fanPose(items.length, 0, spec.radius, spec.maxHalfAngle)
   const width = Math.max(spec.w, 2 * Math.abs(sample.x) + spec.w)
@@ -118,16 +145,19 @@ export function CardFan({
     >
       {items.map((card, index) => {
         const pose = fanPose(items.length, index, spec.radius, spec.maxHalfAngle)
+        const key = card ? `${card.rank}${card.suit}` : index
         return (
           <div
-            key={index}
-            className="absolute bottom-0 left-1/2 origin-bottom"
+            key={key}
+            className="absolute bottom-0 left-1/2 origin-bottom transition-transform duration-200 ease-out"
             style={{
               transform: `translateX(calc(-50% + ${pose.x}px)) translateY(${pose.y - pose.depth}px) rotate(${pose.rotate}deg)`,
               zIndex: index,
             }}
           >
-            <PlayingCard card={card} faceDown={faceDown || !card} size={size} />
+            <DealIn active={index === arriving}>
+              <PlayingCard card={card} faceDown={faceDown || !card} size={size} />
+            </DealIn>
           </div>
         )
       })}

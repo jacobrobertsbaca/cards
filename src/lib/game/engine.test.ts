@@ -9,6 +9,7 @@ import {
   placeBid,
   playCard,
   isLegalPlay,
+  wouldBeLegalPlay,
   renameGame,
 } from "./engine"
 import { evaluateFormula } from "./formula"
@@ -70,12 +71,20 @@ describe("oh hell", () => {
     state = placeBid(state, state.currentSeat!, 0)
     state = placeBid(state, state.currentSeat!, 1)
     const leader = state.currentSeat!
-    const led = state.hands[leader][0]
+    const led =
+      state.hands[leader].find((card) => isLegalPlay(state, leader, card)) ??
+      state.hands[leader][0]
     state = playCard(state, leader, led)
     const follower = state.currentSeat!
     const offSuit = state.hands[follower].find((card) => card.suit !== led.suit)
     if (offSuit && state.hands[follower].some((card) => card.suit === led.suit)) {
       assert.equal(isLegalPlay(state, follower, offSuit), false)
+      assert.equal(wouldBeLegalPlay(state, follower, offSuit), false)
+    }
+    const follow = state.hands[follower].find((card) => card.suit === led.suit)
+    if (follow) {
+      assert.equal(isLegalPlay(state, leader, follow), false)
+      assert.equal(wouldBeLegalPlay(state, follower, follow), true)
     }
   })
 
@@ -112,7 +121,10 @@ describe("oh hell", () => {
     state = placeBid(state, state.currentSeat!, 0)
     state = placeBid(state, state.currentSeat!, 1)
     const leadSeat = state.currentSeat!
-    state = playCard(state, leadSeat, state.hands[leadSeat][0])
+    const lead =
+      state.hands[leadSeat].find((card) => isLegalPlay(state, leadSeat, card)) ??
+      state.hands[leadSeat][0]
+    state = playCard(state, leadSeat, lead)
     const followSeat = state.currentSeat!
     const follow = state.hands[followSeat].find((card) =>
       isLegalPlay(state, followSeat, card)

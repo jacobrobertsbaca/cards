@@ -1,5 +1,12 @@
 import { maxHandSize } from "./cards"
 
+export const MIN_TRICKS = 1
+export const MAX_TRICKS = 10
+
+export function clampTricks(n: number) {
+  return Math.min(MAX_TRICKS, Math.max(MIN_TRICKS, n))
+}
+
 export function buildUpDown(max: number) {
   const up = Array.from({ length: max }, (_, i) => i + 1)
   const down = Array.from({ length: max - 1 }, (_, i) => max - 1 - i)
@@ -14,34 +21,64 @@ export function buildDown(max: number) {
   return Array.from({ length: max }, (_, i) => max - i)
 }
 
-export function buildFlat(size: number, rounds: number) {
-  return Array.from({ length: rounds }, () => size)
-}
-
 export function patternLabel(pattern: number[]) {
   if (pattern.length === 0) return "—"
-  const max = Math.max(...pattern)
-  const upDown = buildUpDown(max)
-  const up = buildUp(max)
-  const down = buildDown(max)
-  if (same(pattern, upDown)) return `1…${max}…1`
-  if (same(pattern, up)) return `1…${max}`
-  if (same(pattern, down)) return `${max}…1`
-  if (pattern.every((n) => n === pattern[0])) {
-    return `${pattern[0]} × ${pattern.length}`
-  }
-  if (pattern.length <= 8) return pattern.join(" · ")
-  return `${pattern[0]}…${pattern[pattern.length - 1]} · ${pattern.length} rounds`
+  return waypoints(pattern).join("…")
 }
 
-function same(a: number[], b: number[]) {
+export function parsePattern(input: string): number[] | null {
+  const text = input.trim()
+  if (!text) return null
+
+  const parts = text.split(/\s*(?:\.{2,}|…|,|;|·|\s)+\s*/)
+  if (parts.length === 0 || parts.some((part) => !/^\d+$/.test(part))) return null
+
+  return expandRange(parts.map((part) => clampTricks(Number(part))))
+}
+
+export function samePattern(a: number[], b: number[]) {
   return a.length === b.length && a.every((n, i) => n === b[i])
+}
+
+function expandRange(points: number[]) {
+  const result = [points[0]]
+  for (let i = 1; i < points.length; i++) {
+    const from = result[result.length - 1]
+    const to = points[i]
+    if (from === to) {
+      result.push(to)
+      continue
+    }
+    const step = from < to ? 1 : -1
+    for (let n = from + step; n !== to + step; n += step) result.push(n)
+  }
+  return result
+}
+
+function waypoints(pattern: number[]) {
+  const out = [pattern[0]]
+  let dir = 0
+  for (let i = 1; i < pattern.length; i++) {
+    const step = Math.sign(pattern[i] - pattern[i - 1])
+    if (step === 0) {
+      out.push(pattern[i])
+      dir = 0
+      continue
+    }
+    if (dir !== 0 && step !== dir && out[out.length - 1] !== pattern[i - 1]) {
+      out.push(pattern[i - 1])
+    }
+    dir = step
+  }
+  const last = pattern[pattern.length - 1]
+  if (out[out.length - 1] !== last) out.push(last)
+  return out
 }
 
 export function validatePattern(pattern: number[], seatCount: number) {
   if (pattern.length === 0) return "Add at least one round"
-  const cap = maxHandSize(seatCount)
-  if (pattern.some((n) => !Number.isInteger(n) || n < 1)) {
+  const cap = Math.min(MAX_TRICKS, maxHandSize(seatCount))
+  if (pattern.some((n) => !Number.isInteger(n) || n < MIN_TRICKS)) {
     return "Each round needs at least 1 card"
   }
   if (pattern.some((n) => n > cap)) {

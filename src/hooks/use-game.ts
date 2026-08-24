@@ -14,10 +14,7 @@ export function useGame(code: string) {
   const [error, setError] = useState<string | null>(null)
   const [online, setOnline] = useState<string[]>([])
   const recordRef = useRef(record)
-
-  useEffect(() => {
-    recordRef.current = record
-  }, [record])
+  recordRef.current = record
 
   useEffect(() => {
     if (!identity.id) return
@@ -64,13 +61,17 @@ export function useGame(code: string) {
           const nextState = mutate(current.state)
           if (nextState === current.state) return current
           const next = await store.save(code, nextState, current.version)
+          recordRef.current = next
           setRecord(next)
           setError(null)
           return next
         } catch (err) {
           if (err instanceof VersionConflictError) {
             const fresh = await store.get(code)
-            if (fresh) setRecord(fresh)
+            if (fresh) {
+              recordRef.current = fresh
+              setRecord(fresh)
+            }
             continue
           }
           const message = err instanceof Error ? err.message : "Move failed"

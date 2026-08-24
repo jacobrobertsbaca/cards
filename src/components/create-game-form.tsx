@@ -14,7 +14,7 @@ import { validatePattern, buildUpDown } from "@/lib/game/pattern";
 import { validateExpression } from "@/lib/game/formula";
 import { DEFAULT_FORMULA, type LeadTrump } from "@/lib/game/types";
 import { rememberGame } from "@/lib/history";
-import { getGameStore, storeMode } from "@/lib/store";
+import { getGameStore } from "@/lib/store";
 import { gameTooltip } from "@/lib/game/rules";
 
 export function CreateGameForm() {
@@ -86,9 +86,13 @@ export function CreateGameForm() {
       </section>
 
       <section className="space-y-3">
-        <Label>Pattern</Label>
+        <Label>Deal Pattern</Label>
         <p className="text-xs text-muted-foreground">Cards dealt each round.</p>
-        <PatternEditor value={pattern} onChange={setPattern} />
+        <PatternEditor
+          value={pattern}
+          seatCount={seatCount}
+          onChange={setPattern}
+        />
       </section>
 
       <section className="flex items-center justify-between gap-6">

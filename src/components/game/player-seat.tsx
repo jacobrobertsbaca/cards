@@ -1,18 +1,22 @@
 "use client"
 
-import { useEffect, useState, type ReactNode } from "react"
-import { Check, Crown } from "lucide-react"
-import { isLegalPlay } from "@/lib/game/engine"
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import { Check, ClockCheck, Crown } from "lucide-react"
+import { sameCard } from "@/lib/game/cards"
+import { isLegalPlay, wouldBeLegalPlay } from "@/lib/game/engine"
 import type { Card, GameState, Seat } from "@/lib/game/types"
 import { cn } from "@/lib/utils"
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer"
+import { useArrivingIndex } from "@/hooks/use-deal-in"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { FAN_CARD, fanPose } from "./fan"
-import { CardFan, PlayingCard } from "./playing-card"
+import { PopConfirmButton } from "./pop-confirm"
+import { originFromElement, usePlayOrigin } from "./play-origin"
+import { CardFan, DealIn, PlayingCard } from "./playing-card"
 
 export type TableSlot =
   | "south"
@@ -48,6 +52,7 @@ export function PlayerSeat({
   spectating,
   online,
   revealCount,
+  dealing,
   clearing,
   wonTrick,
   onPlay,
@@ -59,9 +64,10 @@ export function PlayerSeat({
   spectating: boolean
   online: boolean
   revealCount?: number
+  dealing?: boolean
   clearing?: boolean
   wonTrick?: boolean
-  onPlay?: (card: Card) => void
+  onPlay?: (card: Card) => void | Promise<void | boolean>
 }) {
   const full = state.hands[seat.index] ?? []
   const hand = revealCount === undefined ? full : full.slice(0, revealCount)
@@ -92,6 +98,7 @@ export function PlayerSeat({
             cards={showFaces ? hand : undefined}
             faceDown={!showFaces}
             size="sm"
+            dealing={dealing}
           />
         </div>
       )}
@@ -102,6 +109,7 @@ export function PlayerSeat({
             cards={showFaces ? hand : undefined}
             faceDown={!showFaces}
             size="sm"
+            dealing={dealing}
           />
         </SideHand>
       )}
@@ -161,6 +169,7 @@ export function PlayerSeat({
             cards={showFaces ? hand : undefined}
             faceDown={!showFaces}
             size="sm"
+            dealing={dealing}
           />
         </SideHand>
       )}
@@ -171,11 +180,12 @@ export function PlayerSeat({
             hand={hand}
             state={state}
             seat={seat.index}
+            dealing={dealing}
             onPlay={onPlay}
           />
         ) : (
           <div className="flex items-end justify-center pt-1">
-            <CardFan count={hand.length} faceDown size="lg" />
+            <CardFan count={hand.length} faceDown size="lg" dealing={dealing} />
           </div>
         )
       )}
@@ -187,16 +197,25 @@ function OwnHand({
   hand,
   state,
   seat,
+  dealing,
   onPlay,
 }: {
   hand: Card[]
   state: GameState
   seat: number
-  onPlay?: (card: Card) => void
+  dealing?: boolean
+  onPlay?: (card: Card) => void | Promise<void | boolean>
 }) {
   const confirmToPlay = useCoarsePointer()
+  const playOrigin = usePlayOrigin()
+  const cardNodes = useRef(new Map<string, HTMLElement>())
   const [hover, setHover] = useState<number | null>(null)
   const [picked, setPicked] = useState<number | null>(null)
+  const [armed, setArmed] = useState<Card | null>(null)
+  const [pending, setPending] = useState(false)
+  const pendingRef = useRef(false)
+  const autoPlayedTurn = useRef<string | null>(null)
+  const arriving = useArrivingIndex(hand.length, dealing)
   const spec = confirmToPlay
     ? { ...FAN_CARD.lg, radius: 300, maxHalfAngle: 12 }
     : FAN_CARD.xl
@@ -206,18 +225,103 @@ function OwnHand({
   const width = Math.max(spec.w, 2 * Math.abs(sample.x) + spec.w)
   const height = spec.h + sample.depth
   const ourTurn = state.phase === "playing" && state.currentSeat === seat
+  const ourBidTurn = state.phase === "bidding" && state.currentSeat === seat
+  const canSelect =
+    Boolean(onPlay) &&
+    !dealing &&
+    (state.phase === "playing" || state.phase === "bidding")
+
+  function canChoose(card: Card) {
+    if (!canSelect) return false
+    if (state.phase === "playing") return wouldBeLegalPlay(state, seat, card)
+    return true
+  }
+
+  function preselectOk(card: Card) {
+    if (!hand.some((item) => sameCard(item, card))) return false
+    if (state.phase === "bidding") return true
+    if (state.phase === "playing") return wouldBeLegalPlay(state, seat, card)
+    if (state.phase === "trick-end") {
+      return wouldBeLegalPlay({ ...state, phase: "playing" }, seat, card)
+    }
+    return false
+  }
+
+  const armedNow = armed !== null && preselectOk(armed) ? armed : null
+  const pickedNow =
+    picked !== null && hand[picked] && preselectOk(hand[picked]) ? picked : null
+  if (armed !== null && armedNow === null) setArmed(null)
+  if (picked !== null && pickedNow === null) setPicked(null)
 
   useEffect(() => {
     setPicked(null)
-  }, [hand.length, ourTurn, confirmToPlay])
+  }, [hand.length, confirmToPlay])
 
-  const selectedCard = picked !== null ? hand[picked] : null
-  const canPlaySelected =
-    selectedCard !== undefined &&
+  useEffect(() => {
+    if (hover === null) return
+    const hovered = hand[hover]
+    if (!hovered || !canChoose(hovered)) setHover(null)
+  }, [dealing, hand, hover, onPlay, seat, state])
+
+  function rememberOrigin(card: Card) {
+    const node = cardNodes.current.get(`${card.rank}${card.suit}`)
+    const felt = node?.closest(".felt")
+    if (!node || !felt || !playOrigin) return
+    playOrigin.set(seat, originFromElement(node, felt))
+  }
+
+  async function playNow(card: Card) {
+    if (!onPlay || pendingRef.current) return false
+    if (!isLegalPlay(state, seat, card)) return false
+    pendingRef.current = true
+    rememberOrigin(card)
+    setPending(true)
+    try {
+      const played = await onPlay(card)
+      if (played === false) return false
+      setArmed(null)
+      setPicked(null)
+      return true
+    } catch {
+      autoPlayedTurn.current = null
+      return false
+    } finally {
+      pendingRef.current = false
+      setPending(false)
+    }
+  }
+
+  const turnKey = ourTurn
+    ? `${state.roundIndex}-${state.currentTrick.length}-${seat}`
+    : null
+
+  useEffect(() => {
+    if (!turnKey || !armedNow || !onPlay) return
+    if (autoPlayedTurn.current === turnKey) return
+    if (!isLegalPlay(state, seat, armedNow)) return
+    autoPlayedTurn.current = turnKey
+    void playNow(armedNow)
+  }, [armedNow, onPlay, seat, state, turnKey])
+
+  const selectedCard =
+    armedNow ?? (pickedNow !== null ? hand[pickedNow] ?? null : null)
+  const selectedLegal = selectedCard !== null && canChoose(selectedCard)
+  const showArmControl =
+    canSelect &&
+    !ourTurn &&
+    !ourBidTurn &&
+    !armedNow &&
     selectedCard !== null &&
-    Boolean(onPlay) &&
+    selectedLegal
+  const showPlayControl =
+    confirmToPlay &&
+    canSelect &&
     ourTurn &&
+    !armedNow &&
+    !pending &&
+    selectedCard !== null &&
     isLegalPlay(state, seat, selectedCard)
+  const showControl = showPlayControl || showArmControl
 
   return (
     <div>
@@ -230,62 +334,86 @@ function OwnHand({
         onMouseLeave={() => setHover(null)}
       >
         {hand.map((card, index) => {
-          const canPlay =
-            Boolean(onPlay) &&
-            ourTurn &&
-            isLegalPlay(state, seat, card)
+          const legal = canChoose(card)
+          const isArmed = armedNow !== null && sameCard(armedNow, card)
           const pose = fanPose(hand.length, index, spec.radius, spec.maxHalfAngle, gap)
+          const spreadFrom = confirmToPlay ? pickedNow : hover
           const spread =
-            hover === null || index === hover
+            spreadFrom === null || index === spreadFrom
               ? 0
-              : Math.sign(index - hover) * neighborPush(Math.abs(index - hover))
-          const lift = !confirmToPlay && hover === index ? -6 : 0
+              : Math.sign(index - spreadFrom) * neighborPush(Math.abs(index - spreadFrom))
+          const lift = !confirmToPlay && legal && hover === index ? -6 : 0
           return (
             <div
-              key={`${card.rank}${card.suit}${index}`}
-              className="absolute bottom-0 left-1/2 origin-bottom transition-transform duration-150 ease-out"
-              onMouseEnter={() => setHover(index)}
+              key={`${card.rank}${card.suit}`}
+              ref={(node) => {
+                const key = `${card.rank}${card.suit}`
+                if (node) cardNodes.current.set(key, node)
+                else cardNodes.current.delete(key)
+              }}
+              className={cn(
+                "absolute bottom-0 left-1/2 origin-bottom transition-transform duration-200 ease-out",
+                !legal && "pointer-events-none"
+              )}
+              onMouseEnter={() => setHover(legal ? index : null)}
               style={{
                 transform: `translateX(calc(-50% + ${pose.x + spread}px)) translateY(${pose.y - pose.depth + lift}px) rotate(${pose.rotate}deg)`,
                 zIndex: index,
                 isolation: "isolate",
               }}
             >
-              <PlayingCard
-                card={card}
-                size={cardSize}
-                selected={picked === index}
-                disabled={ourTurn && !canPlay}
-                onClick={
-                  canPlay
-                    ? () => {
-                        if (confirmToPlay) {
+              <DealIn active={index === arriving}>
+                <PlayingCard
+                  card={card}
+                  size={cardSize}
+                  selected={pickedNow === index || isArmed}
+                  armed={isArmed}
+                  disabled={!legal}
+                  onClick={
+                    legal
+                      ? () => {
+                          if (ourTurn && !confirmToPlay) {
+                            void playNow(card)
+                            return
+                          }
+                          if (isArmed) {
+                            setArmed(null)
+                            setPicked(index)
+                            return
+                          }
+                          setArmed(null)
                           setPicked((current) => (current === index ? null : index))
-                          return
                         }
-                        onPlay?.(card)
-                      }
-                    : undefined
-                }
-                className="touch-manipulation hover:translate-y-0"
-              />
+                      : undefined
+                  }
+                  className="touch-manipulation hover:translate-y-0"
+                />
+              </DealIn>
             </div>
           )
         })}
       </div>
-      {confirmToPlay && ourTurn && canPlaySelected && (
-        <button
-          type="button"
-          aria-label="Play selected card"
-          onClick={() => {
-            if (selectedCard) onPlay?.(selectedCard)
-            setPicked(null)
+      <div className="pointer-events-none fixed bottom-[calc(12rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 -translate-x-1/2">
+        <PopConfirmButton
+          show={Boolean(showControl && selectedCard)}
+          label={showPlayControl ? "Play selected card" : "Arm selected card"}
+          className="pointer-events-auto flex size-9 touch-manipulation items-center justify-center rounded-full bg-amber-200 text-[#16352b] shadow-[0_0_0_1px_rgb(251_191_36/0.45)] hover:bg-amber-100"
+          onConfirm={() => {
+            if (!selectedCard) return
+            if (showPlayControl) {
+              void playNow(selectedCard)
+              return
+            }
+            setArmed(selectedCard)
           }}
-          className="bid-check pointer-events-auto fixed bottom-[calc(13.25rem+env(safe-area-inset-bottom,0px))] left-1/2 z-20 flex size-9 -translate-x-1/2 touch-manipulation items-center justify-center rounded-full bg-amber-200 text-[#16352b] shadow-[0_0_0_1px_rgb(251_191_36/0.45)] hover:bg-amber-100"
         >
-          <Check className="size-4" strokeWidth={2.75} />
-        </button>
-      )}
+          {showPlayControl ? (
+            <Check className="size-4" strokeWidth={2.75} />
+          ) : (
+            <ClockCheck className="size-4" strokeWidth={2.75} />
+          )}
+        </PopConfirmButton>
+      </div>
     </div>
   )
 }
@@ -304,8 +432,10 @@ function SideHand({
   children: ReactNode
 }) {
   return (
-    <div className="flex h-48 w-22 shrink-0 items-center justify-center">
-      <div className={slot === "west" ? "-rotate-90" : "rotate-90"}>{children}</div>
+    <div className="flex h-48 w-22 shrink-0 items-center justify-center overflow-visible">
+      <div className={cn("overflow-visible", slot === "west" ? "-rotate-90" : "rotate-90")}>
+        {children}
+      </div>
     </div>
   )
 }

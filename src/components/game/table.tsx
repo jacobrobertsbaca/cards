@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Check, Copy } from "lucide-react"
-import { isLegalPlay, trickWinner } from "@/lib/game/engine"
+import { trickWinner } from "@/lib/game/engine"
 import { rulesLine } from "@/lib/game/rules"
 import { displayGameTitle } from "@/lib/game/title"
 import type { Card, GameState } from "@/lib/game/types"
@@ -16,6 +16,7 @@ import type { TableMotion } from "@/hooks/use-table-motion"
 import { PlayerSeat, slotFor } from "./player-seat"
 import { Scoreboard } from "./score-sheet"
 import { DealOverlay } from "./deal-overlay"
+import { PlayOriginProvider } from "./play-origin"
 import { TrickPile } from "./trick-pile"
 import { TrumpSpot } from "./trump-reveal"
 
@@ -35,12 +36,11 @@ export function GameTable({
   spectating: boolean
   onlineIds: string[]
   motion: TableMotion
-  onPlay: (card: Card) => void
+  onPlay: (card: Card) => void | Promise<void | boolean>
   onRename: (title: string) => void
 }) {
   const anchor = mySeat ?? 0
   const count = state.settings.seatCount
-  const clearing = state.phase === "game-over"
   const waiting =
     (state.phase === "trick-end" && !motion.trickLeaving) ||
     state.phase === "round-end"
@@ -50,6 +50,7 @@ export function GameTable({
       : null
 
   return (
+    <PlayOriginProvider>
     <div
       className={cn(
         "felt relative h-full min-h-0 w-full overflow-hidden overscroll-none",
@@ -68,7 +69,6 @@ export function GameTable({
         <TrumpSpot
           card={state.trump}
           phase={motion.trumpPhase}
-          clearing={clearing}
         />
       )}
 
@@ -99,25 +99,23 @@ export function GameTable({
             spectating={spectating}
             online={seat.playerId ? onlineIds.includes(seat.playerId) : false}
             revealCount={motion.dealing ? motion.revealed[seat.index] : undefined}
-            clearing={clearing}
+            dealing={motion.dealing}
             wonTrick={trickWinnerSeat === seat.index}
             onPlay={
               self &&
-              state.phase === "playing" &&
-              !motion.dealing &&
-              !motion.trickLeaving
-                ? (card) => {
-                    if (isLegalPlay(state, seat.index, card)) onPlay(card)
-                  }
+              (state.phase === "playing" || state.phase === "bidding") &&
+              !motion.dealing
+                ? onPlay
                 : undefined
             }
           />
         )
       })}
 
-      <DealOverlay shuffling={motion.shuffling} flights={motion.flights} />
+      <DealOverlay shuffling={motion.shuffling} />
       <Scoreboard state={state} />
     </div>
+    </PlayOriginProvider>
   )
 }
 

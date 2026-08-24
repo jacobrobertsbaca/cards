@@ -61,10 +61,10 @@ function ScoreTable({ state }: { state: GameState }) {
 
   return (
     <div className="max-h-[min(24rem,70vh)] overflow-auto">
-      <table className="w-full border-collapse font-sans text-sm">
+      <table className="w-full min-w-max border-collapse font-sans text-sm">
         <thead>
           <tr>
-            <th className="sticky top-0 bg-[#f7f4ee] pr-3 pb-2 text-left text-sm font-medium text-[#6f675e]">
+            <th className="sticky top-0 left-0 z-20 bg-[#f7f4ee] pr-3 pb-2 text-left text-sm font-medium text-[#6f675e] shadow-[2px_0_6px_-2px_rgb(44_38_30/0.16)]">
               Tricks
             </th>
             {standings.map((row) => (
@@ -90,7 +90,7 @@ function ScoreTable({ state }: { state: GameState }) {
           ) : (
             state.history.map((round, index) => (
               <tr key={index}>
-                <td className="py-1.5 pr-3 text-left text-sm tabular-nums text-[#6f675e]">
+                <td className="sticky left-0 z-10 bg-[#f7f4ee] py-1.5 pr-3 text-left text-sm tabular-nums text-[#6f675e] shadow-[2px_0_6px_-2px_rgb(44_38_30/0.16)]">
                   {round.cards}
                 </td>
                 {standings.map((row) => {
@@ -121,7 +121,7 @@ function ScoreTable({ state }: { state: GameState }) {
           <tr>
             <td
               className={cn(
-                "sticky bottom-0 bg-[#f7f4ee] pt-2 text-left font-medium",
+                "sticky bottom-0 left-0 z-20 bg-[#f7f4ee] pt-2 text-left font-medium shadow-[2px_0_6px_-2px_rgb(44_38_30/0.16)]",
                 state.history.length > 0 && "border-t border-[#2c261e]/10"
               )}
             >

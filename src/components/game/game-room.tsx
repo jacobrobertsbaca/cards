@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useGame } from "@/hooks/use-game"
 import { useContinuePrompt } from "@/hooks/use-continue-prompt"
+import { useGameOverPrompt } from "@/hooks/use-game-over-prompt"
 import { useJoinPrompt } from "@/hooks/use-join-prompt"
 import { useRoundEndPrompt } from "@/hooks/use-round-end-prompt"
 import { useTableMotion } from "@/hooks/use-table-motion"
@@ -10,6 +11,7 @@ import {
   GameError,
   continueTrick,
   filledSeats,
+  isLegalPlay,
   joinGame,
   placeBid,
   playCard,
@@ -22,13 +24,11 @@ import { displayGameTitle } from "@/lib/game/title"
 import { rememberGame } from "@/lib/history"
 import { gameTooltip } from "@/lib/game/rules"
 import { playDeal, unlockAudio } from "@/lib/audio"
+import { sameCard } from "@/lib/game/cards"
 import type { Card, GameState } from "@/lib/game/types"
 import { subscribeIdentity } from "@/lib/identity"
 import { GameTable } from "./table"
-import {
-  BidPanel,
-  GameOverOverlay,
-} from "./overlays"
+import { BidPanel } from "./overlays"
 
 export function GameRoom({ code }: { code: string }) {
   const { record, status, error, online, apply, identity } = useGame(code)
@@ -37,7 +37,11 @@ export function GameRoom({ code }: { code: string }) {
 
   const state = record?.state
   const mySeat = state && identity.id ? seatForPlayer(state, identity.id) : null
-  const role = mySeat ? "player" : spectating ? "spectator" : "unknown"
+  const role = mySeat
+    ? "player"
+    : spectating || state?.phase === "game-over"
+      ? "spectator"
+      : "unknown"
 
   useEffect(() => {
     if (!state || !identity.id) return
@@ -83,16 +87,33 @@ export function GameRoom({ code }: { code: string }) {
     }
   }
 
-  async function onPlay(card: Card) {
+  const onPlay = useCallback(async (card: Card) => {
     unlockAudio()
-    if (mySeat == null) return
+    if (mySeat == null) return false
     try {
-      await apply((current) => playCard(current, mySeat.index, card))
+      const next = await apply((current) => {
+        if (!isLegalPlay(current, mySeat.index, card)) return current
+        return playCard(current, mySeat.index, card)
+      })
+      const stillInHand = next.state.hands[mySeat.index]?.some((item) =>
+        sameCard(item, card)
+      )
+      if (stillInHand) {
+        setActionError(null)
+        return false
+      }
+      setActionError(null)
       playDeal()
+      return true
     } catch (err) {
+      if (err instanceof GameError && err.message === "That card cannot be played") {
+        setActionError(null)
+        return false
+      }
       setActionError(err instanceof Error ? err.message : "Could not play")
+      throw err
     }
-  }
+  }, [apply, mySeat])
 
   async function onAdvanceTrick() {
     unlockAudio()
@@ -123,7 +144,7 @@ export function GameRoom({ code }: { code: string }) {
   if (status === "loading") {
     return (
       <div className="flex h-full items-center justify-center text-sm text-white/60">
-        Finding the table…
+        Finding game
       </div>
     )
   }
@@ -156,7 +177,7 @@ export function GameRoom({ code }: { code: string }) {
       onJoin={() => void onJoin()}
       onSpectate={() => setSpectating(true)}
       onBid={(bid) => void onBid(bid)}
-      onPlay={(card) => void onPlay(card)}
+      onPlay={onPlay}
       onAdvanceTrick={() => void onAdvanceTrick()}
       onContinue={() => void onContinue()}
       onRename={(title) => void onRename(title)}
@@ -188,13 +209,14 @@ function ReadyTable({
   onJoin: () => void
   onSpectate: () => void
   onBid: (bid: number) => void
-  onPlay: (card: Card) => void
+  onPlay: (card: Card) => void | Promise<void | boolean>
   onAdvanceTrick: () => void
   onContinue: () => void
   onRename: (title: string) => void
 }) {
   const seated = mySeatIndex !== null
-  const showJoin = role === "unknown" && !seated
+  const showJoin =
+    role === "unknown" && !seated && state.phase !== "game-over"
   const motion = useTableMotion(state, mySeatIndex)
   const myTurnToBid =
     seated &&
@@ -202,7 +224,6 @@ function ReadyTable({
     state.currentSeat === mySeatIndex &&
     !motion.dealing
   const showRoundEnd = state.phase === "round-end" && role !== "unknown"
-  const showGameOver = state.phase === "game-over"
   const lastRound = state.history[state.history.length - 1]
   const waitingToContinue =
     role !== "unknown" &&
@@ -227,6 +248,10 @@ function ReadyTable({
     })),
     onContinue,
   })
+  useGameOverPrompt({
+    active: state.phase === "game-over",
+    state,
+  })
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -242,9 +267,6 @@ function ReadyTable({
       />
       {myTurnToBid && mySeatIndex !== null && (
         <BidPanel state={state} seat={mySeatIndex} onBid={onBid} />
-      )}
-      {showGameOver && role !== "unknown" && (
-        <GameOverOverlay state={state} />
       )}
       {actionError && (
         <p className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/40 px-3 py-1 text-xs text-red-100">

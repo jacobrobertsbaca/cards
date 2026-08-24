@@ -78,8 +78,10 @@ export function TrumpSpot({
         <div className={cn("trump-spin", phase === "flip" && "trump-spin-run")}>
           <div
             className={cn(
-              "rounded-lg shadow-[0_0_14px_rgb(251_191_36/0.14)] ring-amber-200/70 ring-offset-[#16352b]",
-              compact ? "ring-1 ring-offset-1" : "ring-2 ring-offset-2"
+              "border-amber-200/70 shadow-[0_0_14px_rgb(251_191_36/0.14)]",
+              compact
+                ? "rounded-[calc(var(--radius-md)+3px)] border p-0.5"
+                : "rounded-[calc(var(--radius-lg)+6px)] border-2 p-1"
             )}
           >
             <PlayingCard

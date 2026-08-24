@@ -137,9 +137,8 @@ export function placeBid(state: GameState, seat: number, bid: number): GameState
   return next
 }
 
-export function isLegalPlay(state: GameState, seat: number, card: Card) {
+export function wouldBeLegalPlay(state: GameState, seat: number, card: Card) {
   if (state.phase !== "playing") return false
-  if (state.currentSeat !== seat) return false
   const hand = state.hands[seat]
   if (!hand.some((item) => sameCard(item, card))) return false
 
@@ -159,6 +158,11 @@ export function isLegalPlay(state: GameState, seat: number, card: Card) {
 
   const canFollow = hand.some((item) => item.suit === led.suit)
   return !canFollow || card.suit === led.suit
+}
+
+export function isLegalPlay(state: GameState, seat: number, card: Card) {
+  if (state.currentSeat !== seat) return false
+  return wouldBeLegalPlay(state, seat, card)
 }
 
 export function playCard(state: GameState, seat: number, card: Card): GameState {
