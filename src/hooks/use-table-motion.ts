@@ -73,10 +73,28 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
   const [trick, setTrick] = useState<TrickPlay[]>(visibleTrick(state))
   const [trickLeaving, setTrickLeaving] = useState(false)
   const [trickWinnerSeat, setTrickWinnerSeat] = useState<number | null>(null)
+  // Winner of the trick currently on the table. Kept across startRound so the
+  // clear animation still aims at the seat that won under the *old* trump.
+  const heldWinnerRef = useRef<number | null>(null)
 
   const enteringDeal =
     state.phase === "bidding" &&
     (prevPhase.current === "lobby" || prevPhase.current === "round-end")
+
+  function rememberWinner(plays: TrickPlay[], trump: GameState["trump"]) {
+    if (plays.length === 0) {
+      heldWinnerRef.current = null
+      return null
+    }
+    const winner = trickWinner(plays, trump)
+    heldWinnerRef.current = winner
+    return winner
+  }
+
+  function clearWinner() {
+    heldWinnerRef.current = null
+    setTrickWinnerSeat(null)
+  }
 
   useEffect(() => {
     armAudio()
@@ -131,17 +149,29 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
 
     const held = shownTrick.current.length > 0
     if (held) {
-      setTrickWinnerSeat(trickWinner(shownTrick.current, state.trump))
+      // Prefer the winner captured while the previous trump was still in force.
+      // Recomputing with state.trump here is wrong after startRound replaces it.
+      const winner =
+        heldWinnerRef.current ??
+        trickWinner(
+          shownTrick.current,
+          from === "round-end"
+            ? (state.history.at(-1)?.trump ?? null)
+            : state.trump
+        )
+      heldWinnerRef.current = winner
+      setTrickWinnerSeat(winner)
       setTrickLeaving(true)
       later(() => {
         shownTrick.current = []
         setTrick([])
         setTrickLeaving(false)
-        setTrickWinnerSeat(null)
+        clearWinner()
       }, TRICK_CLEAR_MS)
     } else {
       setTrick([])
       setTrickLeaving(false)
+      clearWinner()
     }
 
     const clearAt = held ? TRICK_CLEAR_MS : 0
@@ -231,13 +261,7 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
       shownTrick.current = plays
       setTrick(plays)
       setTrickLeaving(false)
-      setTrickWinnerSeat(
-        state.phase === "trick-end" ||
-          state.phase === "round-end" ||
-          state.phase === "game-over"
-          ? trickWinner(plays, state.trump)
-          : null
-      )
+      setTrickWinnerSeat(rememberWinner(plays, state.trump))
       return
     }
 
@@ -245,13 +269,13 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     const collect = !live && sitting.length > 0
     const newLead = live && plays.length === 1 && sitting.length > 1
     if ((collect || newLead) && !prefersReducedMotion()) {
-      setTrickWinnerSeat(trickWinner(sitting, state.trump))
+      setTrickWinnerSeat(rememberWinner(sitting, state.trump))
       setTrickLeaving(true)
       const timer = window.setTimeout(() => {
         shownTrick.current = newLead ? plays : []
         setTrick(newLead ? plays : [])
         setTrickLeaving(false)
-        setTrickWinnerSeat(null)
+        clearWinner()
       }, 420)
       return () => window.clearTimeout(timer)
     }
@@ -259,7 +283,7 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     shownTrick.current = live ? plays : []
     setTrick(live ? plays : [])
     setTrickLeaving(false)
-    setTrickWinnerSeat(null)
+    clearWinner()
   }, [trickSig]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const turnKey =
