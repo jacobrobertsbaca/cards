@@ -531,7 +531,7 @@ function SeatMenu({
         {showMakeBot && (
           <DropdownMenuItem onClick={() => onMakeBot(seat.index)}>
             <Bot />
-            Make bot
+            Add bot
           </DropdownMenuItem>
         )}
         {showSwap && (

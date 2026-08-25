@@ -39,7 +39,7 @@ export function Scoreboard({
       <DialogTrigger
         aria-label="Score sheet"
         className={cn(
-          "pointer-events-auto absolute right-[max(0.5rem,env(safe-area-inset-right))] bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-20 cursor-pointer text-white outline-none md:right-4 md:bottom-4",
+          "pointer-events-auto absolute right-[max(0.5rem,env(safe-area-inset-right))] bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-20 cursor-pointer text-white outline-none md:right-4 md:bottom-4 md:rounded-md md:px-2.5 md:py-1.5 md:hover:bg-white/10",
           className
         )}
       >
