@@ -143,6 +143,11 @@ export function GameTable({
                   : undefined
               }
               dealing={motion.dealing}
+              dealDelays={
+                motion.dealing
+                  ? motion.dealDelays?.[seat.index]
+                  : undefined
+              }
               wonTrick={trickWinnerSeat === seat.index}
               canManageBots={canManageBots}
               onMakeBot={onMakeBot}

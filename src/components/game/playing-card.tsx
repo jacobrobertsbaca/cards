@@ -1,10 +1,10 @@
 "use client"
 
-import { type ReactNode } from "react"
+import { motion } from "motion/react"
 import { SUIT_GLYPH } from "@/lib/game/cards"
-import { useArrivingIndex, useDealIn } from "@/hooks/use-deal-in"
 import type { Card } from "@/lib/game/types"
 import { cn } from "@/lib/utils"
+import { DealIn } from "./deal-in"
 import { FAN_CARD, fanPose } from "./fan"
 
 const SIZES = {
@@ -46,7 +46,9 @@ export function PlayingCard({
         faceDown
           ? "border-[#1b2a4a] bg-[#243868] card-back"
           : "border-black/5 bg-[#fbfaf6]",
-        onClick && !disabled && "[@media(hover:hover)]:hover:-translate-y-2 [@media(hover:hover)]:hover:shadow-lg",
+        onClick &&
+          !disabled &&
+          "[@media(hover:hover)]:hover:-translate-y-2 [@media(hover:hover)]:hover:shadow-lg",
         selected && "border-transparent ring-[3px] ring-amber-300",
         disabled && "brightness-[0.55] saturate-50",
         className
@@ -89,20 +91,7 @@ export function PlayingCard({
   )
 }
 
-export function DealIn({ active, children }: { active: boolean; children: ReactNode }) {
-  const ref = useDealIn(active)
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        "inline-block [transform-origin:center]",
-        active && "relative z-20"
-      )}
-    >
-      {children}
-    </div>
-  )
-}
+export { DealIn }
 
 export function CardFan({
   count,
@@ -111,6 +100,7 @@ export function CardFan({
   size = "sm",
   rotate = 0,
   dealing = false,
+  dealDelays,
 }: {
   count?: number
   cards?: Card[]
@@ -118,9 +108,9 @@ export function CardFan({
   size?: keyof typeof SIZES
   rotate?: number
   dealing?: boolean
+  dealDelays?: number[]
 }) {
   const items = cards ?? Array.from({ length: count ?? 0 })
-  const arriving = useArrivingIndex(items.length, dealing)
   const spec = FAN_CARD[size]
   const sample = fanPose(items.length, 0, spec.radius, spec.maxHalfAngle)
   const width = Math.max(spec.w, 2 * Math.abs(sample.x) + spec.w)
@@ -138,22 +128,40 @@ export function CardFan({
       {items.map((card, index) => {
         const pose = fanPose(items.length, index, spec.radius, spec.maxHalfAngle)
         const key = card ? `${card.rank}${card.suit}` : index
+        const delayMs = dealing ? dealDelays?.[index] : undefined
         return (
           <div
             key={key}
-            className={cn(
-              "absolute bottom-0 left-1/2 origin-bottom",
-              !dealing &&
-                "transition-transform duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-            )}
-            style={{
-              transform: `translateX(calc(-50% + ${pose.x}px)) translateY(${pose.y - pose.depth}px) rotate(${pose.rotate}deg)`,
-              zIndex: index,
-            }}
+            className="absolute bottom-0 left-1/2 origin-bottom"
+            style={{ zIndex: index }}
           >
-            <DealIn active={index === arriving}>
-              <PlayingCard card={card} faceDown={faceDown || !card} size={size} />
-            </DealIn>
+            <motion.div
+              className="origin-bottom"
+              initial={false}
+              animate={{
+                x: pose.x,
+                y: pose.y - pose.depth,
+                rotate: pose.rotate,
+              }}
+              transition={
+                dealing
+                  ? { type: "spring", stiffness: 420, damping: 32, mass: 0.7 }
+                  : {
+                      type: "tween",
+                      duration: 0.34,
+                      ease: [0.22, 1, 0.36, 1],
+                    }
+              }
+              style={{ marginLeft: "-50%" }}
+            >
+              <DealIn delayMs={delayMs}>
+                <PlayingCard
+                  card={card}
+                  faceDown={faceDown || !card}
+                  size={size}
+                />
+              </DealIn>
+            </motion.div>
           </div>
         )
       })}

@@ -11,6 +11,7 @@ import {
   MessageCircleHeart,
   Shuffle,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { isLegalPlay } from "@/lib/game/engine";
 import { EMOTE_LABELS, TABLE_EMOTES, type TableEmote } from "@/lib/emotes";
 import type { Card, GameState, Seat } from "@/lib/game/types";
@@ -27,17 +28,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
-import { useArrivingIndex } from "@/hooks/use-deal-in";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EmoteIcon } from "./emote-icon";
+import { DealIn } from "./deal-in";
 import { FAN_CARD, fanPose } from "./fan";
 import { PopConfirmButton } from "./pop-confirm";
 import { originFromElement, usePlayOrigin } from "./play-origin";
-import { CardFan, DealIn, PlayingCard } from "./playing-card";
+import { CardFan, PlayingCard } from "./playing-card";
 
 export type TableSlot =
   | "south"
@@ -93,6 +94,7 @@ export function PlayerSeat({
   emote,
   revealCount,
   dealing,
+  dealDelays,
   wonTrick,
   canManageBots,
   onMakeBot,
@@ -111,6 +113,7 @@ export function PlayerSeat({
   emote?: { id: string; emote: TableEmote };
   revealCount?: number;
   dealing?: boolean;
+  dealDelays?: number[];
   wonTrick?: boolean;
   canManageBots?: boolean;
   onMakeBot?: (seatIndex: number) => void;
@@ -149,6 +152,7 @@ export function PlayerSeat({
             faceDown={!showFaces}
             size="sm"
             dealing={dealing}
+            dealDelays={dealDelays}
           />
         </div>
       )}
@@ -160,6 +164,7 @@ export function PlayerSeat({
             faceDown={!showFaces}
             size="sm"
             dealing={dealing}
+            dealDelays={dealDelays}
           />
         </SideHand>
       )}
@@ -272,6 +277,7 @@ export function PlayerSeat({
             faceDown={!showFaces}
             size="sm"
             dealing={dealing}
+            dealDelays={dealDelays}
           />
         </SideHand>
       )}
@@ -283,11 +289,18 @@ export function PlayerSeat({
             state={state}
             seat={seat.index}
             dealing={dealing}
+            dealDelays={dealDelays}
             onPlay={onPlay}
           />
         ) : (
           <div className="flex items-end justify-center pt-1">
-            <CardFan count={hand.length} faceDown size="lg" dealing={dealing} />
+            <CardFan
+              count={hand.length}
+              faceDown
+              size="lg"
+              dealing={dealing}
+              dealDelays={dealDelays}
+            />
           </div>
         ))}
     </div>
@@ -299,12 +312,14 @@ function OwnHand({
   state,
   seat,
   dealing,
+  dealDelays,
   onPlay,
 }: {
   hand: Card[];
   state: GameState;
   seat: number;
   dealing?: boolean;
+  dealDelays?: number[];
   onPlay?: (card: Card) => void | Promise<void | boolean>;
 }) {
   const confirmToPlay = useCoarsePointer();
@@ -314,7 +329,6 @@ function OwnHand({
   const [picked, setPicked] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
-  const arriving = useArrivingIndex(hand.length, dealing);
   const spec = confirmToPlay
     ? { ...FAN_CARD.lg, radius: 300, maxHalfAngle: 12 }
     : { ...FAN_CARD.xl, maxHalfAngle: 18 };
@@ -383,6 +397,7 @@ function OwnHand({
               : Math.sign(index - spreadFrom) *
                 neighborPush(Math.abs(index - spreadFrom));
           const lift = !confirmToPlay && hover === index ? -6 : 0;
+          const delayMs = dealing ? dealDelays?.[index] : undefined;
           return (
             <div
               key={`${card.rank}${card.suit}`}
@@ -391,41 +406,53 @@ function OwnHand({
                 if (node) cardNodes.current.set(key, node);
                 else cardNodes.current.delete(key);
               }}
-              className="absolute bottom-0 left-1/2 origin-bottom transition-transform duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+              className="absolute bottom-0 left-1/2 origin-bottom"
               onMouseEnter={() => setHover(index)}
-              style={{
-                transform: `translateX(calc(-50% + ${
-                  pose.x + spread
-                }px)) translateY(${pose.y - pose.depth + lift}px) rotate(${
-                  pose.rotate
-                }deg)`,
-                zIndex: index,
-                isolation: "isolate",
-              }}
+              style={{ zIndex: index, isolation: "isolate" }}
             >
-              <DealIn active={index === arriving}>
-                <PlayingCard
-                  card={card}
-                  size={cardSize}
-                  selected={picked === index}
-                  disabled={ourTurn && !canPlay}
-                  onClick={
-                    canPlay
-                      ? () => {
-                          if (pendingRef.current) return;
-                          if (confirmToPlay) {
-                            setPicked((current) =>
-                              current === index ? null : index
-                            );
-                            return;
+              <motion.div
+                className="origin-bottom"
+                initial={false}
+                animate={{
+                  x: pose.x + spread,
+                  y: pose.y - pose.depth + lift,
+                  rotate: pose.rotate,
+                }}
+                transition={
+                  dealing
+                    ? { type: "spring", stiffness: 420, damping: 32, mass: 0.7 }
+                    : {
+                        type: "tween",
+                        duration: 0.34,
+                        ease: [0.22, 1, 0.36, 1],
+                      }
+                }
+                style={{ marginLeft: "-50%" }}
+              >
+                <DealIn delayMs={delayMs}>
+                  <PlayingCard
+                    card={card}
+                    size={cardSize}
+                    selected={picked === index}
+                    disabled={ourTurn && !canPlay}
+                    onClick={
+                      canPlay
+                        ? () => {
+                            if (pendingRef.current) return;
+                            if (confirmToPlay) {
+                              setPicked((current) =>
+                                current === index ? null : index
+                              );
+                              return;
+                            }
+                            void playNow(card);
                           }
-                          void playNow(card);
-                        }
-                      : undefined
-                  }
-                  className="touch-manipulation hover:translate-y-0"
-                />
-              </DealIn>
+                        : undefined
+                    }
+                    className="touch-manipulation hover:translate-y-0"
+                  />
+                </DealIn>
+              </motion.div>
             </div>
           );
         })}

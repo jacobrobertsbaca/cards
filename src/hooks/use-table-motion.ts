@@ -5,6 +5,7 @@ import { armAudio, playDeal, playDing, playShuffle } from "@/lib/audio"
 import { cardsThisRound, trickWinner } from "@/lib/game/engine"
 import type { GameState, TrickPlay } from "@/lib/game/types"
 import type { TableSlot } from "@/components/game/player-seat"
+import { DEAL_FLIGHT_MS } from "@/components/game/deal-in"
 
 export type TrumpPhase = "hidden" | "down" | "flip" | "fly" | "rest"
 
@@ -57,16 +58,37 @@ function prefersReducedMotion() {
   )
 }
 
+function handCounts(state: GameState) {
+  return state.hands.map((hand) => hand.length)
+}
+
+function buildDealDelays(queue: number[], seatCount: number, stagger: number) {
+  const delays = Array.from({ length: seatCount }, () => [] as number[])
+  const seen = Array.from({ length: seatCount }, () => 0)
+  queue.forEach((seat, index) => {
+    delays[seat][seen[seat]] = index * stagger
+    seen[seat] += 1
+  })
+  return delays
+}
+
 export function useTableMotion(state: GameState, mySeat: number | null) {
   const prevPhase = useRef(state.phase)
   const shownTrick = useRef<TrickPlay[]>(visibleTrick(state))
   const seen = useRef(state)
   const lastTurn = useRef<string | null>(null)
+  // Round whose deal animation has finished (or was skipped on late join).
+  // Null means the next bidding phase should animate a deal. Reset on cleanup
+  // if the animation was interrupted so Strict Mode / remounts can retry.
+  const dealtRoundRef = useRef<number | null>(
+    state.phase === "lobby" || state.phase === "round-end"
+      ? null
+      : state.roundIndex
+  )
   const [dealing, setDealing] = useState(false)
   const [shuffling, setShuffling] = useState(false)
-  const [revealed, setRevealed] = useState<number[]>(
-    state.seats.map((_, index) => state.hands[index]?.length ?? 0)
-  )
+  const [revealed, setRevealed] = useState<number[]>(handCounts(state))
+  const [dealDelays, setDealDelays] = useState<number[][] | null>(null)
   const [trumpPhase, setTrumpPhase] = useState<TrumpPhase>(
     state.trump ? "rest" : "hidden"
   )
@@ -79,7 +101,8 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
 
   const enteringDeal =
     state.phase === "bidding" &&
-    (prevPhase.current === "lobby" || prevPhase.current === "round-end")
+    !dealing &&
+    dealtRoundRef.current !== state.roundIndex
 
   function rememberWinner(plays: TrickPlay[], trump: GameState["trump"]) {
     if (plays.length === 0) {
@@ -118,16 +141,42 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
   }, [mySeat, state])
 
   useLayoutEffect(() => {
+    if (state.phase === "lobby") {
+      dealtRoundRef.current = null
+      prevPhase.current = state.phase
+      return
+    }
+
     const from = prevPhase.current
-    const started =
-      state.phase === "bidding" && (from === "lobby" || from === "round-end")
-
+    const fromRoundEnd = from === "round-end"
     prevPhase.current = state.phase
-    if (!started) return
 
+    const shouldAnimateDeal =
+      state.phase === "bidding" && dealtRoundRef.current !== state.roundIndex
+
+    if (!shouldAnimateDeal) {
+      // Deal timers were cleared (or never started) while `dealing` was still
+      // true — snap hands to the real counts so seats are never left short.
+      setDealing(false)
+      setShuffling(false)
+      setDealDelays(null)
+      setRevealed(handCounts(state))
+      if (state.phase !== "bidding" || dealtRoundRef.current === state.roundIndex) {
+        setTrumpPhase(state.trump ? "rest" : "hidden")
+      }
+      return
+    }
+
+    dealtRoundRef.current = state.roundIndex
+    let finished = false
     const timers: number[] = []
-    const later = (fn: () => void, ms: number) => {
-      timers.push(window.setTimeout(fn, ms))
+    let cancelled = false
+    const after = (fn: () => void, ms: number) => {
+      timers.push(
+        window.setTimeout(() => {
+          if (!cancelled) fn()
+        }, ms)
+      )
     }
 
     const count = state.settings.seatCount
@@ -140,12 +189,12 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
       }
     }
     const hasTrump = state.trump !== null
-    const fullHands = state.hands.map((hand) => hand.length)
-    const fromRoundEnd = from === "round-end"
+    const fullHands = handCounts(state)
 
     setDealing(true)
     setTrumpPhase("hidden")
     setRevealed(state.seats.map(() => 0))
+    setDealDelays(null)
 
     const held = shownTrick.current.length > 0
     if (held) {
@@ -155,14 +204,14 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
         heldWinnerRef.current ??
         trickWinner(
           shownTrick.current,
-          from === "round-end"
+          fromRoundEnd
             ? (state.history.at(-1)?.trump ?? null)
             : state.trump
         )
       heldWinnerRef.current = winner
       setTrickWinnerSeat(winner)
       setTrickLeaving(true)
-      later(() => {
+      after(() => {
         shownTrick.current = []
         setTrick([])
         setTrickLeaving(false)
@@ -179,72 +228,100 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
       fromRoundEnd && !prefersReducedMotion() ? POST_CLEAR_PAUSE_MS : 0
     const dealStartAt = clearAt + pauseBeforeDeal
     const finishDeal = (animateTrump: boolean) => {
+      finished = true
       setRevealed(fullHands)
       if (!hasTrump) {
         setTrumpPhase("hidden")
         setDealing(false)
+        setDealDelays(null)
         return
       }
       if (!animateTrump) {
         setTrumpPhase("rest")
         setDealing(false)
+        setDealDelays(null)
         return
       }
       setTrumpPhase("down")
-      later(() => {
+      after(() => {
         setTrumpPhase("flip")
         playDeal()
       }, TRUMP_ENTER_MS + TRUMP_SHOW_MS)
-      later(() => {
+      after(() => {
         setTrumpPhase("fly")
         setDealing(false)
+        setDealDelays(null)
       }, TRUMP_ENTER_MS + TRUMP_SHOW_MS + TRUMP_FLIP_MS + TRUMP_HOLD_MS)
-      later(
+      after(
         () => setTrumpPhase("rest"),
         TRUMP_ENTER_MS + TRUMP_SHOW_MS + TRUMP_FLIP_MS + TRUMP_HOLD_MS + TRUMP_FLY_MS
       )
     }
 
     if (prefersReducedMotion()) {
-      later(() => {
+      after(() => {
         playShuffle()
         finishDeal(false)
       }, dealStartAt)
-      return () => timers.forEach((timer) => window.clearTimeout(timer))
+      return () => {
+        cancelled = true
+        timers.forEach((timer) => window.clearTimeout(timer))
+        if (!finished) dealtRoundRef.current = null
+      }
     }
 
-    later(() => {
+    // Scale stagger with hand size: large deals overlap more instead of
+    // rushing individual flights or dragging on forever.
+    const totalCards = Math.max(queue.length, 1)
+    const dealBudgetMs = Math.min(4600, Math.max(1600, totalCards * 55))
+    const stagger = Math.max(26, Math.min(78, dealBudgetMs / totalCards))
+    const delays = buildDealDelays(queue, count, stagger)
+    const lastDelay = (totalCards - 1) * stagger
+    const soundEvery = Math.max(1, Math.round(48 / stagger))
+
+    after(() => {
       setShuffling(true)
       playShuffle()
     }, dealStartAt)
-    later(() => setShuffling(false), dealStartAt + 520)
+    after(() => {
+      setShuffling(false)
+      // Mount the full fan once so seats don't reflow as cards arrive —
+      // Motion handles staggered fly-ins from the table center.
+      setDealDelays(delays)
+      setRevealed(fullHands)
+      playDeal()
+    }, dealStartAt + 520)
 
-    const budget = 2800
-    const flightMs = 380
-    const minStagger = Math.ceil(flightMs / Math.max(count, 1))
-    const stagger = Math.max(
-      minStagger,
-      Math.min(100, budget / Math.max(queue.length, 1))
-    )
+    for (let index = soundEvery; index < totalCards; index += soundEvery) {
+      after(() => playDeal(), dealStartAt + 520 + index * stagger)
+    }
 
-    queue.forEach((seat, index) => {
-      later(() => {
-        playDeal()
-        setRevealed((current) =>
-          current.map((value, seatIndex) =>
-            seatIndex === seat ? value + 1 : value
-          )
-        )
-      }, dealStartAt + 520 + index * stagger)
-    })
-
-    later(
+    after(
       () => finishDeal(true),
-      dealStartAt + 520 + queue.length * stagger + flightMs + 60
+      dealStartAt + 520 + lastDelay + DEAL_FLIGHT_MS + 80
     )
 
-    return () => timers.forEach((timer) => window.clearTimeout(timer))
-  }, [mySeat, state.dealer, state.phase, state.roundIndex, state.settings.seatCount])
+    return () => {
+      cancelled = true
+      timers.forEach((timer) => window.clearTimeout(timer))
+      // Allow a remount/restart (Strict Mode) to animate this round again.
+      if (!finished) dealtRoundRef.current = null
+    }
+  }, [state.phase, state.roundIndex, state.dealer, state.settings.seatCount])
+
+  // Keep revealed counts honest whenever we are not mid-deal (e.g. cards
+  // played, or a deal that finished without every incremental tick firing).
+  useEffect(() => {
+    if (dealing || enteringDeal) return
+    if (state.phase === "lobby") return
+    const full = handCounts(state)
+    setRevealed((current) =>
+      current.length === full.length &&
+      current.every((value, index) => value === full[index])
+        ? current
+        : full
+    )
+  }, [dealing, enteringDeal, state.phase, state.hands, state.roundIndex])
 
   const plays = visibleTrick(state)
   const live = state.currentTrick.length > 0
@@ -303,6 +380,7 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
     dealing,
     shuffling,
     revealed,
+    dealDelays,
     trumpPhase,
     trick,
     trickLeaving,
