@@ -4,7 +4,10 @@ import { DEFAULT_FORMULA } from "./types"
 import {
   continueTrick,
   createGame,
+  createRematch,
+  beginRematch,
   joinGame,
+  leaveGame,
   legalBids,
   makeBot,
   placeBid,
@@ -15,6 +18,7 @@ import {
   renameGame,
   startGame,
   swapSeats,
+  updateSettings,
 } from "./engine"
 import { evaluateFormula } from "./formula"
 import type { GameSettings } from "./types"
@@ -85,6 +89,16 @@ describe("oh hell", () => {
     assert.match(state.seats[1].playerId ?? "", /^bot:1$/)
     assert.equal(state.seats[2].playerId, "a")
     assert.equal(state.seats[2].isBot, false)
+  })
+
+  it("lets a seated player leave the lobby", () => {
+    let state = createGame(settings())
+    state = joinGame(state, "a", "Ada")
+    state = joinGame(state, "b", "Bea")
+    state = leaveGame(state, "a")
+    assert.equal(state.seats[0].playerId, null)
+    assert.equal(state.seats[0].displayName, null)
+    assert.equal(state.seats[1].playerId, "b")
   })
 
   it("moves a player into an empty seat in the lobby", () => {
@@ -192,5 +206,56 @@ describe("oh hell", () => {
     assert.match(state.title, /Oh Hell$/)
     assert.equal(renameGame(state, "Friday night").title, "Friday night")
     assert.equal(renameGame(state, "   ").title, state.title)
+  })
+
+  it("updates lobby settings and resizes empty seats", () => {
+    let state = createGame(settings({ seatCount: 3 }))
+    state = joinGame(state, "a", "Ada")
+    state = updateSettings(state, {
+      ...state.settings,
+      seatCount: 4,
+      hook: false,
+      leadTrump: "always",
+    })
+    assert.equal(state.settings.seatCount, 4)
+    assert.equal(state.settings.hook, false)
+    assert.equal(state.seats.length, 4)
+    assert.equal(state.seats[3].playerId, null)
+
+    state = updateSettings(state, { ...state.settings, seatCount: 2 })
+    assert.equal(state.settings.seatCount, 2)
+    assert.equal(state.seats.length, 2)
+    assert.equal(state.seats[0].playerId, "a")
+  })
+
+  it("builds a rematch lobby with the same seats and settings", () => {
+    let state = createGame(settings({ seatCount: 2, pattern: [1], hook: false }))
+    state = joinGame(state, "a", "Ada")
+    state = makeBot(state, 1)
+    state = startGame(state)
+    while (state.phase === "bidding") {
+      state = placeBid(state, state.currentSeat!, 0)
+    }
+    while (state.phase === "playing" || state.phase === "trick-end") {
+      if (state.phase === "trick-end") {
+        state = continueTrick(state)
+        continue
+      }
+      const seat = state.currentSeat!
+      const card = state.hands[seat][0]
+      state = playCard(state, seat, card)
+    }
+    assert.equal(state.phase, "game-over")
+
+    const rematch = createRematch(state)
+    assert.equal(rematch.phase, "lobby")
+    assert.deepEqual(rematch.settings, state.settings)
+    assert.equal(rematch.seats[0].playerId, "a")
+    assert.equal(rematch.seats[1].isBot, true)
+    assert.equal(rematch.scores.every((score) => score === 0), true)
+
+    const linked = beginRematch(state, "rematch1")
+    assert.equal(linked.rematchCode, "rematch1")
+    assert.equal(beginRematch(linked, "rematch2").rematchCode, "rematch1")
   })
 })

@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Bot, BotOff, Check, Crown, Ellipsis, Shuffle } from "lucide-react";
+import {
+  Bot,
+  BotOff,
+  Check,
+  Crown,
+  Ellipsis,
+  LogOut,
+  MessageCircleHeart,
+  Shuffle,
+} from "lucide-react";
 import { isLegalPlay } from "@/lib/game/engine";
-import type { TableEmote } from "@/lib/emotes";
+import { EMOTE_LABELS, TABLE_EMOTES, type TableEmote } from "@/lib/emotes";
 import type { Card, GameState, Seat } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +21,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import { useArrivingIndex } from "@/hooks/use-deal-in";
 import {
@@ -84,6 +98,8 @@ export function PlayerSeat({
   onMakeBot,
   onRemoveBot,
   onSwapSeats,
+  onLeave,
+  onEmote,
   onPlay,
 }: {
   seat: Seat;
@@ -100,6 +116,8 @@ export function PlayerSeat({
   onMakeBot?: (seatIndex: number) => void;
   onRemoveBot?: (seatIndex: number) => void;
   onSwapSeats?: (seatIndex: number) => void;
+  onLeave?: () => void;
+  onEmote?: (emote: TableEmote) => void;
   onPlay?: (card: Card) => void | Promise<void | boolean>;
 }) {
   const full = state.hands[seat.index] ?? [];
@@ -209,6 +227,7 @@ export function PlayerSeat({
             </Tooltip>
           )}
           <span className="inline-flex items-center gap-1">
+       
             {seat.isBot ? (
               <Bot
                 aria-label="Bot player"
@@ -226,15 +245,19 @@ export function PlayerSeat({
                 )}
               />
             )}
-            {canManageBots && (
+    <span className="inline-flex items-center ">
+            {onEmote && <EmoteMenu onEmote={onEmote} />}
+            {(canManageBots || (self && onLeave)) && (
               <SeatMenu
                 seat={seat}
                 self={self}
-                onMakeBot={onMakeBot}
-                onRemoveBot={onRemoveBot}
-                onSwapSeats={onSwapSeats}
+                onMakeBot={canManageBots ? onMakeBot : undefined}
+                onRemoveBot={canManageBots ? onRemoveBot : undefined}
+                onSwapSeats={canManageBots ? onSwapSeats : undefined}
+                onLeave={self ? onLeave : undefined}
               />
             )}
+            </span>
           </span>
           {state.phase !== "lobby" && <BidIndicator bid={bid} tricks={tricks} />}
         </div>
@@ -474,25 +497,28 @@ function SeatMenu({
   onMakeBot,
   onRemoveBot,
   onSwapSeats,
+  onLeave,
 }: {
   seat: Seat;
   self: boolean;
   onMakeBot?: (seatIndex: number) => void;
   onRemoveBot?: (seatIndex: number) => void;
   onSwapSeats?: (seatIndex: number) => void;
+  onLeave?: () => void;
 }) {
   const empty = !seat.playerId;
   const showMakeBot = empty && onMakeBot;
   const showRemoveBot = seat.isBot && onRemoveBot;
   const showSwap = !self && onSwapSeats;
+  const showLeave = self && onLeave;
 
-  if (!showMakeBot && !showRemoveBot && !showSwap) return null;
+  if (!showMakeBot && !showRemoveBot && !showSwap && !showLeave) return null;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Seat options"
-        className="pointer-events-auto flex size-5 shrink-0 items-center justify-center rounded-md text-white/45 hover:bg-white/10 hover:text-white/80"
+        className="pointer-events-auto flex size-6 shrink-0 items-center justify-center rounded-md text-white/45 hover:bg-white/10 hover:text-white/80"
       >
         <Ellipsis className="size-3.5" />
       </DropdownMenuTrigger>
@@ -519,8 +545,53 @@ function SeatMenu({
             Remove bot
           </DropdownMenuItem>
         )}
+        {showLeave && (
+          <DropdownMenuItem onClick={onLeave}>
+            <LogOut />
+            Leave game
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function EmoteMenu({ onEmote }: { onEmote: (emote: TableEmote) => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        aria-label="Emotes"
+        title="Emotes"
+        className="pointer-events-auto inline-flex size-6 shrink-0 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white"
+      >
+        <MessageCircleHeart className="size-3.5" />
+      </PopoverTrigger>
+      <PopoverContent
+        align="center"
+        side="top"
+        sideOffset={6}
+        className="w-auto rounded-2xl border-0 bg-black/25 p-1.5 text-white shadow-none ring-1 ring-white/15 backdrop-blur-sm"
+      >
+        <div className="grid grid-cols-4">
+          {TABLE_EMOTES.map((emote) => (
+            <button
+              key={emote}
+              type="button"
+              onClick={() => {
+                onEmote(emote);
+                setOpen(false);
+              }}
+              className="flex size-9 items-center justify-center rounded-full text-[1.35rem] transition-colors hover:bg-white/20 active:scale-95 md:size-8 md:text-xl"
+              aria-label={EMOTE_LABELS[emote]}
+            >
+              <EmoteIcon emote={emote} />
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

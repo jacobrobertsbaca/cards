@@ -31,6 +31,8 @@ export function useJoinPrompt({
       return
     }
 
+    // Sonner ignores cancel.onClick when dismissible is false, so Spectate
+    // must be a real button element (or the primary action) to work.
     toast(`${taken}/${seats} joined`, {
       id: TOAST_ID,
       duration: Infinity,
@@ -46,14 +48,21 @@ export function useJoinPrompt({
           }
         : {
             label: "Spectate",
-            onClick: () => onSpectateRef.current(),
+            onClick: (event) => {
+              event.preventDefault()
+              onSpectateRef.current()
+            },
           },
-      cancel: open
-        ? {
-            label: "Spectate",
-            onClick: () => onSpectateRef.current(),
-          }
-        : undefined,
+      cancel: open ? (
+        <button
+          type="button"
+          data-button="true"
+          data-cancel="true"
+          onClick={() => onSpectateRef.current()}
+        >
+          Spectate
+        </button>
+      ) : undefined,
     })
 
     return () => {

@@ -63,6 +63,34 @@ describe("bot helpers", () => {
     state = makeBot(state, 2)
     assert.equal(shouldRunBotController(state, 0), true)
     assert.equal(shouldRunBotController(state, 1), false)
+    assert.equal(
+      shouldRunBotController(state, null, {
+        playerId: "spectator",
+        onlineIds: ["spectator"],
+      }),
+      false
+    )
+  })
+
+  it("lets a spectator run bots when no humans are seated", () => {
+    let state = createGame(settings)
+    state = makeBot(state, 0)
+    state = makeBot(state, 1)
+    state = makeBot(state, 2)
+    assert.equal(
+      shouldRunBotController(state, null, {
+        playerId: "spec-a",
+        onlineIds: ["spec-b", "spec-a"],
+      }),
+      true
+    )
+    assert.equal(
+      shouldRunBotController(state, null, {
+        playerId: "spec-b",
+        onlineIds: ["spec-b", "spec-a"],
+      }),
+      false
+    )
   })
 })
 

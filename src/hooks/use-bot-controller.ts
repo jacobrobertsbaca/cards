@@ -17,11 +17,19 @@ export function useBotController(
   state: GameState | undefined,
   version: number | undefined,
   mySeatIndex: number | null,
-  apply: (mutate: (current: GameState) => GameState) => Promise<unknown>
+  apply: (mutate: (current: GameState) => GameState) => Promise<unknown>,
+  opts?: { playerId?: string; onlineIds?: string[] }
 ) {
+  const playerId = opts?.playerId
+  const onlineIds = opts?.onlineIds
+
   useEffect(() => {
-    if (!state || version === undefined || mySeatIndex === null) return
-    if (!shouldRunBotController(state, mySeatIndex)) return
+    if (!state || version === undefined) return
+    if (
+      !shouldRunBotController(state, mySeatIndex, { playerId, onlineIds })
+    ) {
+      return
+    }
 
     const seat = state.currentSeat
     if (seat === null) return
@@ -51,6 +59,8 @@ export function useBotController(
   }, [
     apply,
     mySeatIndex,
+    onlineIds,
+    playerId,
     state?.currentSeat,
     state?.phase,
     version,

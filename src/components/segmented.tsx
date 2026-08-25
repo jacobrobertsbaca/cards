@@ -21,7 +21,7 @@ export function Segmented<T extends string | number>({
   return (
     <div
       className={cn(
-        "flex flex-wrap gap-1 rounded-lg bg-muted p-1",
+        "flex flex-wrap gap-0.5 rounded-md bg-muted p-0.5",
         className
       )}
     >
@@ -33,7 +33,7 @@ export function Segmented<T extends string | number>({
             type="button"
             onClick={() => onChange(option.value)}
             className={cn(
-              "rounded-md px-2.5 py-1 text-sm transition-all",
+              "rounded-sm px-2 py-0.5 text-sm transition-all",
               active
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"

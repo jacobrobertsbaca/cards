@@ -50,6 +50,7 @@ export function createGame(settings: GameSettings): GameState {
     trickLeader: 0,
     scores: Array.from({ length: settings.seatCount }, () => 0),
     history: [],
+    rematchCode: null,
   };
 }
 
@@ -97,6 +98,19 @@ export function removeBot(state: GameState, seatIndex: number): GameState {
   const next = clone(state);
   const seat = next.seats[seatIndex];
   if (!seat?.isBot) throw new GameError("That seat is not a bot");
+
+  seat.playerId = null;
+  seat.displayName = null;
+  seat.isBot = false;
+  return next;
+}
+
+export function leaveGame(state: GameState, playerId: string): GameState {
+  if (state.phase !== "lobby")
+    throw new GameError("The game has already started");
+  const next = clone(state);
+  const seat = next.seats.find((item) => item.playerId === playerId);
+  if (!seat || seat.isBot) throw new GameError("You are not seated");
 
   seat.playerId = null;
   seat.displayName = null;
@@ -170,6 +184,61 @@ export function renameGame(state: GameState, title: string): GameState {
   if (!trimmed || trimmed === state.title) return state;
   const next = clone(state);
   next.title = trimmed;
+  return next;
+}
+
+export function updateSettings(
+  state: GameState,
+  settings: GameSettings
+): GameState {
+  if (state.phase !== "lobby") {
+    throw new GameError("The game has already started");
+  }
+  const patternError = validatePattern(settings.pattern, settings.seatCount);
+  if (patternError) throw new GameError(patternError);
+  if (settings.seatCount < 2 || settings.seatCount > 5) {
+    throw new GameError("Games need 2–5 players");
+  }
+
+  const next = clone(state);
+  const previousCount = next.settings.seatCount;
+  const nextCount = settings.seatCount;
+  next.settings = clone(settings);
+
+  if (nextCount === previousCount) return next;
+
+  if (nextCount > previousCount) {
+    for (let index = previousCount; index < nextCount; index++) {
+      next.seats.push({
+        index,
+        playerId: null,
+        displayName: null,
+        isBot: false,
+      });
+      next.hands.push([]);
+      next.bids.push(null);
+      next.tricks.push(0);
+      next.scores.push(0);
+    }
+    return next;
+  }
+
+  for (let index = nextCount; index < previousCount; index++) {
+    if (next.seats[index]?.playerId) {
+      throw new GameError("Clear the extra seats before reducing players");
+    }
+  }
+
+  next.seats = next.seats.slice(0, nextCount).map((seat, index) => ({
+    ...seat,
+    index,
+  }));
+  next.hands = next.hands.slice(0, nextCount);
+  next.bids = next.bids.slice(0, nextCount);
+  next.tricks = next.tricks.slice(0, nextCount);
+  next.scores = next.scores.slice(0, nextCount);
+  if (next.dealer >= nextCount) next.dealer = 0;
+  if (next.trickLeader >= nextCount) next.trickLeader = 0;
   return next;
 }
 
@@ -366,6 +435,28 @@ export function startRound(state: GameState): GameState {
 
 export function seatForPlayer(state: GameState, playerId: string) {
   return state.seats.find((seat) => seat.playerId === playerId) ?? null;
+}
+
+export function createRematch(state: GameState): GameState {
+  const next = createGame(state.settings);
+  next.title = state.title;
+  next.seats = state.seats.map((seat) => ({
+    index: seat.index,
+    playerId: seat.playerId,
+    displayName: seat.displayName,
+    isBot: seat.isBot,
+  }));
+  return next;
+}
+
+export function beginRematch(state: GameState, code: string): GameState {
+  if (state.phase !== "game-over") {
+    throw new GameError("The game is not over");
+  }
+  if (state.rematchCode) return state;
+  const next = clone(state);
+  next.rematchCode = code;
+  return next;
 }
 
 export function filledSeats(state: GameState) {

@@ -85,6 +85,7 @@ export type GameState = {
   trickLeader: number;
   scores: number[];
   history: RoundRecord[];
+  rematchCode: string | null;
 };
 
 export const DEFAULT_FORMULA: ScoringFormula = {

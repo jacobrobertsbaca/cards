@@ -8,12 +8,36 @@ export function isBotSeat(seat: Seat) {
   return seat.isBot === true
 }
 
-export function shouldRunBotController(state: GameState, mySeatIndex: number) {
+export function shouldRunBotController(
+  state: GameState,
+  mySeatIndex: number | null,
+  opts?: { playerId?: string; onlineIds?: string[] }
+) {
   const humanSeats = state.seats
     .filter((seat) => seat.playerId && !isBotSeat(seat))
     .map((seat) => seat.index)
-  if (humanSeats.length === 0) return false
-  return Math.min(...humanSeats) === mySeatIndex
+
+  if (humanSeats.length > 0) {
+    if (mySeatIndex === null) return false
+    return Math.min(...humanSeats) === mySeatIndex
+  }
+
+  // All-bot table: one spectator client drives moves.
+  const playerId = opts?.playerId
+  if (!playerId) return false
+  const seatedIds = new Set(
+    state.seats
+      .map((seat) => seat.playerId)
+      .filter((id): id is string => Boolean(id))
+  )
+  if (seatedIds.has(playerId)) return false
+
+  const onlineIds = opts?.onlineIds ?? []
+  const spectators = onlineIds
+    .filter((id) => !seatedIds.has(id))
+    .sort()
+  if (spectators.length === 0) return true
+  return spectators[0] === playerId
 }
 
 const ACTIVE_PARAMS = TRAINED_BOT_PARAMS

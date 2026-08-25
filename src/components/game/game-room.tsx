@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { useGame } from "@/hooks/use-game"
 import { useBotController } from "@/hooks/use-bot-controller"
 import { useContinuePrompt } from "@/hooks/use-continue-prompt"
@@ -9,12 +10,16 @@ import { useJoinPrompt } from "@/hooks/use-join-prompt"
 import { useLobbyReadyPrompt } from "@/hooks/use-lobby-ready-prompt"
 import { useRoundEndPrompt } from "@/hooks/use-round-end-prompt"
 import { useTableMotion } from "@/hooks/use-table-motion"
+import { gameCode } from "@/lib/codes"
 import {
   GameError,
+  beginRematch,
   continueTrick,
+  createRematch,
   filledSeats,
   isLegalPlay,
   joinGame,
+  leaveGame,
   makeBot,
   placeBid,
   playCard,
@@ -25,6 +30,7 @@ import {
   startGame,
   startRound,
   swapSeats,
+  updateSettings,
 } from "@/lib/game/engine"
 import { displayGameTitle } from "@/lib/game/title"
 import { rememberGame } from "@/lib/history"
@@ -32,12 +38,14 @@ import { gameTooltip } from "@/lib/game/rules"
 import { playDeal, unlockAudio } from "@/lib/audio"
 import { sameCard } from "@/lib/game/cards"
 import { isTableEmote, type TableEmote } from "@/lib/emotes"
-import type { Card, GameState } from "@/lib/game/types"
+import type { Card, GameSettings, GameState } from "@/lib/game/types"
 import { subscribeIdentity } from "@/lib/identity"
+import { getGameStore } from "@/lib/store"
 import { GameTable } from "./table"
 import { BidPanel } from "./overlays"
 
 export function GameRoom({ code }: { code: string }) {
+  const router = useRouter()
   const { record, status, error, online, emotes, sendEmote, apply, identity } = useGame(code)
   const [spectating, setSpectating] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -185,6 +193,10 @@ export function GameRoom({ code }: { code: string }) {
     }
   }
 
+  async function onSaveSettings(settings: GameSettings) {
+    await apply((current) => updateSettings(current, settings))
+  }
+
   async function onMakeBot(seatIndex: number) {
     try {
       await apply((current) => makeBot(current, seatIndex))
@@ -206,6 +218,56 @@ export function GameRoom({ code }: { code: string }) {
       await apply((current) => swapSeats(current, identity.id, targetSeatIndex))
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not change places")
+    }
+  }
+
+  async function onLeave() {
+    unlockAudio()
+    setActionError(null)
+    try {
+      await apply((current) => leaveGame(current, identity.id))
+      setSpectating(false)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not leave")
+    }
+  }
+
+  async function onRematch() {
+    unlockAudio()
+    setActionError(null)
+    const current = stateRef.current
+    if (!current) return
+
+    if (current.rematchCode) {
+      rememberGame({
+        code: current.rematchCode,
+        kind: "oh-hell",
+        title: displayGameTitle(current.title),
+        summary: gameTooltip(current.settings),
+      })
+      router.push(`/${current.rematchCode}`)
+      return
+    }
+
+    const nextCode = gameCode()
+    try {
+      const rematch = createRematch(current)
+      await getGameStore().create({
+        code: nextCode,
+        kind: rematch.settings.kind,
+        state: rematch,
+      })
+      const saved = await apply((existing) => beginRematch(existing, nextCode))
+      const dest = saved.state.rematchCode ?? nextCode
+      rememberGame({
+        code: dest,
+        kind: "oh-hell",
+        title: displayGameTitle(rematch.title),
+        summary: gameTooltip(rematch.settings),
+      })
+      router.push(`/${dest}`)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not rematch")
     }
   }
 
@@ -239,6 +301,7 @@ export function GameRoom({ code }: { code: string }) {
       state={state}
       version={record?.version}
       mySeatIndex={mySeat?.index ?? null}
+      playerId={identity.id}
       role={role}
       online={online}
       emotes={emotes}
@@ -252,9 +315,12 @@ export function GameRoom({ code }: { code: string }) {
       onAdvanceTrick={() => void onAdvanceTrick()}
       onContinue={() => void onContinue()}
       onRename={(title) => void onRename(title)}
+      onSaveSettings={onSaveSettings}
       onMakeBot={(seatIndex) => void onMakeBot(seatIndex)}
       onRemoveBot={(seatIndex) => void onRemoveBot(seatIndex)}
       onSwapSeats={(seatIndex) => void onSwapSeats(seatIndex)}
+      onLeave={() => void onLeave()}
+      onRematch={() => void onRematch()}
       apply={apply}
     />
   )
@@ -264,6 +330,7 @@ function ReadyTable({
   state,
   version,
   mySeatIndex,
+  playerId,
   role,
   online,
   emotes,
@@ -277,14 +344,18 @@ function ReadyTable({
   onAdvanceTrick,
   onContinue,
   onRename,
+  onSaveSettings,
   onMakeBot,
   onRemoveBot,
   onSwapSeats,
+  onLeave,
+  onRematch,
   apply,
 }: {
   state: GameState
   version: number | undefined
   mySeatIndex: number | null
+  playerId: string
   role: "player" | "spectator" | "unknown"
   online: string[]
   emotes: { id: string; playerId: string; emote: string }[]
@@ -298,9 +369,12 @@ function ReadyTable({
   onAdvanceTrick: () => void
   onContinue: () => void
   onRename: (title: string) => void
+  onSaveSettings: (settings: GameSettings) => void | Promise<void>
   onMakeBot: (seatIndex: number) => void
   onRemoveBot: (seatIndex: number) => void
   onSwapSeats: (seatIndex: number) => void
+  onLeave: () => void
+  onRematch: () => void
   apply: (mutate: (current: GameState) => GameState) => Promise<unknown>
 }) {
   const seated = mySeatIndex !== null
@@ -359,8 +433,12 @@ function ReadyTable({
   useGameOverPrompt({
     active: state.phase === "game-over",
     state,
+    onRematch,
   })
-  useBotController(state, version, mySeatIndex, apply)
+  useBotController(state, version, mySeatIndex, apply, {
+    playerId,
+    onlineIds: online,
+  })
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -375,10 +453,16 @@ function ReadyTable({
         motion={motion}
         onPlay={onPlay}
         onRename={onRename}
-        canManageBots={role === "player" && state.phase === "lobby"}
+        onSaveSettings={onSaveSettings}
+        canManageBots={
+          (role === "player" || role === "spectator") && state.phase === "lobby"
+        }
         onMakeBot={onMakeBot}
         onRemoveBot={onRemoveBot}
-        onSwapSeats={onSwapSeats}
+        onSwapSeats={role === "player" ? onSwapSeats : undefined}
+        onLeave={
+          role === "player" && state.phase === "lobby" ? onLeave : undefined
+        }
       />
       {myTurnToBid && mySeatIndex !== null && (
         <BidPanel state={state} seat={mySeatIndex} onBid={onBid} />

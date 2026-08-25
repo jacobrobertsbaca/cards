@@ -25,14 +25,23 @@ function ScoreDelta({ value }: { value: number }) {
   return <> {value}</>;
 }
 
-export function Scoreboard({ state }: { state: GameState }) {
+export function Scoreboard({
+  state,
+  className,
+}: {
+  state: GameState;
+  className?: string;
+}) {
   const standings = ranking(state);
 
   return (
     <Dialog>
       <DialogTrigger
         aria-label="Score sheet"
-        className="pointer-events-auto absolute right-[max(0.5rem,env(safe-area-inset-right))] bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-20 cursor-pointer text-white outline-none md:right-4 md:bottom-4"
+        className={cn(
+          "pointer-events-auto absolute right-[max(0.5rem,env(safe-area-inset-right))] bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-20 cursor-pointer text-white outline-none md:right-4 md:bottom-4",
+          className
+        )}
       >
         <span className="hidden text-right text-xs md:block">
           {standings.map((row) => (
