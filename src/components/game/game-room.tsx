@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { AnimatePresence, motion } from "motion/react"
+import { LoaderPinwheel } from "lucide-react"
 import { useGame } from "@/hooks/use-game"
 import { useBotController } from "@/hooks/use-bot-controller"
 import { useContinuePrompt } from "@/hooks/use-continue-prompt"
@@ -271,58 +273,82 @@ export function GameRoom({ code }: { code: string }) {
     }
   }
 
-  if (status === "loading") {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-white/60">
-        Finding game
-      </div>
-    )
-  }
-
-  if (status === "missing") {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-white">
-        <p className="text-lg font-medium">No table here</p>
-        <p className="text-sm text-white/60">That link does not match a game.</p>
-      </div>
-    )
-  }
-
-  if (status === "error" || !state) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-red-200">
-        {error ?? "Something went wrong"}
-      </div>
-    )
-  }
-
   return (
-    <ReadyTable
-      state={state}
-      version={record?.version}
-      mySeatIndex={mySeat?.index ?? null}
-      playerId={identity.id}
-      role={role}
-      online={online}
-      emotes={emotes}
-      onEmote={sendEmote}
-      actionError={actionError}
-      onJoin={() => void onJoin()}
-      onSpectate={() => setSpectating(true)}
-      onStart={() => void onStart()}
-      onBid={onBid}
-      onPlay={onPlay}
-      onAdvanceTrick={() => void onAdvanceTrick()}
-      onContinue={() => void onContinue()}
-      onRename={(title) => void onRename(title)}
-      onSaveSettings={onSaveSettings}
-      onMakeBot={(seatIndex) => void onMakeBot(seatIndex)}
-      onRemoveBot={(seatIndex) => void onRemoveBot(seatIndex)}
-      onSwapSeats={(seatIndex) => void onSwapSeats(seatIndex)}
-      onLeave={() => void onLeave()}
-      onRematch={() => void onRematch()}
-      apply={apply}
-    />
+    <AnimatePresence mode="wait">
+      {status === "loading" ? (
+        <motion.div
+          key="loading"
+          className="flex h-full items-center justify-center text-white/60"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, scale: 0.88 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <LoaderPinwheel
+            className="size-6 animate-spin"
+            aria-label="Loading game"
+          />
+        </motion.div>
+      ) : status === "missing" ? (
+        <motion.div
+          key="missing"
+          className="flex h-full flex-col items-center justify-center gap-2 text-white"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <p className="text-lg font-medium">No table here</p>
+          <p className="text-sm text-white/60">That link does not match a game.</p>
+        </motion.div>
+      ) : status === "error" || !state ? (
+        <motion.div
+          key="error"
+          className="flex h-full items-center justify-center text-sm text-red-200"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {error ?? "Something went wrong"}
+        </motion.div>
+      ) : (
+        <motion.div
+          key="ready"
+          className="h-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <ReadyTable
+            state={state}
+            version={record?.version}
+            mySeatIndex={mySeat?.index ?? null}
+            playerId={identity.id}
+            role={role}
+            online={online}
+            emotes={emotes}
+            onEmote={sendEmote}
+            actionError={actionError}
+            onJoin={() => void onJoin()}
+            onSpectate={() => setSpectating(true)}
+            onStart={() => void onStart()}
+            onBid={onBid}
+            onPlay={onPlay}
+            onAdvanceTrick={() => void onAdvanceTrick()}
+            onContinue={() => void onContinue()}
+            onRename={(title) => void onRename(title)}
+            onSaveSettings={onSaveSettings}
+            onMakeBot={(seatIndex) => void onMakeBot(seatIndex)}
+            onRemoveBot={(seatIndex) => void onRemoveBot(seatIndex)}
+            onSwapSeats={(seatIndex) => void onSwapSeats(seatIndex)}
+            onLeave={() => void onLeave()}
+            onRematch={() => void onRematch()}
+            apply={apply}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 

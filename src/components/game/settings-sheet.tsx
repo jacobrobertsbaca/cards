@@ -62,7 +62,7 @@ export function GameSettingsSheet({
         title="Settings"
         className="pointer-events-auto ml-auto flex size-8 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white md:size-6 md:text-white/55"
       >
-        <Settings className="size-3.5" />
+        <Settings className="size-4" />
       </SheetTrigger>
       <SheetContent
         side="right"

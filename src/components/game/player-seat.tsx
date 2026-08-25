@@ -227,7 +227,6 @@ export function PlayerSeat({
             </Tooltip>
           )}
           <span className="inline-flex items-center gap-1">
-       
             {seat.isBot ? (
               <Bot
                 aria-label="Bot player"
@@ -245,21 +244,23 @@ export function PlayerSeat({
                 )}
               />
             )}
-    <span className="inline-flex items-center ">
-            {onEmote && <EmoteMenu onEmote={onEmote} />}
-            {(canManageBots || (self && onLeave)) && (
-              <SeatMenu
-                seat={seat}
-                self={self}
-                onMakeBot={canManageBots ? onMakeBot : undefined}
-                onRemoveBot={canManageBots ? onRemoveBot : undefined}
-                onSwapSeats={canManageBots ? onSwapSeats : undefined}
-                onLeave={self ? onLeave : undefined}
-              />
-            )}
+            <span className="inline-flex items-center ">
+              {onEmote && <EmoteMenu onEmote={onEmote} />}
+              {(canManageBots || (self && onLeave)) && (
+                <SeatMenu
+                  seat={seat}
+                  self={self}
+                  onMakeBot={canManageBots ? onMakeBot : undefined}
+                  onRemoveBot={canManageBots ? onRemoveBot : undefined}
+                  onSwapSeats={canManageBots ? onSwapSeats : undefined}
+                  onLeave={self ? onLeave : undefined}
+                />
+              )}
             </span>
           </span>
-          {state.phase !== "lobby" && <BidIndicator bid={bid} tricks={tricks} />}
+          {state.phase !== "lobby" && (
+            <BidIndicator bid={bid} tricks={tricks} />
+          )}
         </div>
       </div>
 
@@ -596,7 +597,7 @@ function EmoteMenu({ onEmote }: { onEmote: (emote: TableEmote) => void }) {
 }
 
 function BidIndicator({ bid, tricks }: { bid: number | null; tricks: number }) {
-  if (bid === null) return null
+  if (bid === null) return null;
 
   return (
     <Tooltip>
@@ -610,7 +611,7 @@ function BidIndicator({ bid, tricks }: { bid: number | null; tricks: number }) {
       </TooltipTrigger>
       <TooltipContent>{bidMadeLabel(bid, tricks)}</TooltipContent>
     </Tooltip>
-  )
+  );
 }
 
 function bidMadeLabel(bid: number | null, tricks: number) {
