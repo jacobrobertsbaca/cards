@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { Check } from "lucide-react"
-import { cardsThisRound, legalBids } from "@/lib/game/engine"
-import type { GameState } from "@/lib/game/types"
+import { cardsThisRound, legalBids } from "@/lib/game/actions"
+import type { OhHellState } from "@/lib/oh-hell/types"
 import { cn } from "@/lib/utils"
 import { PopConfirmButton } from "./pop-confirm"
 
@@ -12,7 +12,7 @@ export function BidPanel({
   seat,
   onBid,
 }: {
-  state: GameState
+  state: OhHellState
   seat: number
   onBid: (bid: number) => void | Promise<void>
 }) {

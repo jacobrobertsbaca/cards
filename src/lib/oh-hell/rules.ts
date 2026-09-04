@@ -1,6 +1,6 @@
 import { formulaExplanation } from "./formula"
 import { patternLabel } from "./pattern"
-import type { GameSettings } from "./types"
+import type { OhHellSettings as GameSettings } from "./types"
 
 export function rulesLine(settings: GameSettings) {
   return compactRules(`${settings.seatCount}-player`, patternLabel(settings.pattern))

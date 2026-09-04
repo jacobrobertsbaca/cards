@@ -1,4 +1,4 @@
-import { rankValue } from "../cards"
+import { rankValue } from "@/lib/game/cards"
 import {
   cardsThisRound,
   forbiddenDealerBid,
@@ -6,7 +6,8 @@ import {
   trickWinner,
   wouldBeLegalPlay,
 } from "../engine"
-import type { Card, GameState, Suit, TrickPlay } from "../types"
+import type { Card, Suit, TrickPlay } from "@/lib/game/types"
+import type { OhHellState as GameState } from "../types"
 import type { BotParams } from "./params"
 import { DEFAULT_BOT_PARAMS } from "./params"
 

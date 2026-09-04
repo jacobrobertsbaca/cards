@@ -1,5 +1,6 @@
-import { cardKey, createDeck, shuffle } from "../cards"
-import type { Card, GameState, Suit } from "../types"
+import { cardKey, createDeck, shuffle } from "@/lib/game/cards"
+import type { Card, Suit } from "@/lib/game/types"
+import type { OhHellState as GameState } from "../types"
 
 /** Visible card counts are public; contents of other hands are never read. */
 export function publicHandSize(state: GameState, seat: number) {

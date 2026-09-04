@@ -9,7 +9,7 @@ import {
 
 type GameRow = {
   code: string
-  kind: "oh-hell"
+  kind: "oh-hell" | "bridge"
   state: GameState
   version: number
 }

@@ -24,6 +24,7 @@ import {
   leaveGame,
   makeBot,
   placeBid,
+  placeCall,
   playCard,
   removeBot,
   renameGame,
@@ -33,7 +34,7 @@ import {
   startRound,
   swapSeats,
   updateSettings,
-} from "@/lib/game/engine"
+} from "@/lib/game/actions"
 import { displayGameTitle } from "@/lib/game/title"
 import { rememberGame } from "@/lib/history"
 import { gameTooltip } from "@/lib/game/rules"
@@ -41,10 +42,15 @@ import { playDeal, unlockAudio } from "@/lib/audio"
 import { sameCard } from "@/lib/game/cards"
 import { isTableEmote, type TableEmote } from "@/lib/emotes"
 import type { Card, GameSettings, GameState } from "@/lib/game/types"
+import { isBridge, isOhHell } from "@/lib/game/types"
+import type { BridgeCall } from "@/lib/bridge/types"
+import { actingSeatFor } from "@/lib/bridge/engine"
+import { playFromHistory, sidePoints } from "@/lib/bridge/scoring"
 import { subscribeIdentity } from "@/lib/identity"
 import { getGameStore } from "@/lib/store"
 import { GameTable } from "./table"
 import { BidPanel } from "./overlays"
+import { BridgeBidPanel } from "@/components/bridge/bid-panel"
 
 export function GameRoom({ code }: { code: string }) {
   const router = useRouter()
@@ -68,7 +74,7 @@ export function GameRoom({ code }: { code: string }) {
     if (!state || !identity.id) return
     rememberGame({
       code,
-      kind: "oh-hell",
+      kind: state.settings.kind,
       title: displayGameTitle(state.title),
       summary: gameTooltip(state.settings),
       finished: state.phase === "game-over",
@@ -121,12 +127,28 @@ export function GameRoom({ code }: { code: string }) {
     }
   }
 
+  async function onCall(call: BridgeCall) {
+    unlockAudio()
+    if (mySeat == null) return
+    try {
+      await apply((current) => placeCall(current, mySeat.index, call))
+      playDeal()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not bid")
+      throw err
+    }
+  }
+
   const onPlay = useCallback(async (card: Card) => {
     unlockAudio()
     if (mySeat == null) return false
 
     const current = stateRef.current
     if (!current || !isLegalPlay(current, mySeat.index, card)) return false
+    const fromSeat =
+      isBridge(current)
+        ? (actingSeatFor(current, mySeat.index) ?? mySeat.index)
+        : mySeat.index
 
     optimisticPlay.current = card
     setOptimisticState(playCard(current, mySeat.index, card))
@@ -138,7 +160,7 @@ export function GameRoom({ code }: { code: string }) {
       return playCard(server, mySeat.index, card)
     })
       .then((next) => {
-        const stillInHand = next.state.hands[mySeat.index]?.some((item) =>
+        const stillInHand = next.state.hands[fromSeat]?.some((item) =>
           sameCard(item, card)
         )
         if (stillInHand) {
@@ -334,6 +356,7 @@ export function GameRoom({ code }: { code: string }) {
             onSpectate={() => setSpectating(true)}
             onStart={() => void onStart()}
             onBid={onBid}
+            onCall={onCall}
             onPlay={onPlay}
             onAdvanceTrick={() => void onAdvanceTrick()}
             onContinue={() => void onContinue()}
@@ -366,6 +389,7 @@ function ReadyTable({
   onSpectate,
   onStart,
   onBid,
+  onCall,
   onPlay,
   onAdvanceTrick,
   onContinue,
@@ -391,6 +415,7 @@ function ReadyTable({
   onSpectate: () => void
   onStart: () => void
   onBid: (bid: number) => void | Promise<void>
+  onCall: (call: BridgeCall) => void | Promise<void>
   onPlay: (card: Card) => void | Promise<void | boolean>
   onAdvanceTrick: () => void
   onContinue: () => void
@@ -418,8 +443,8 @@ function ReadyTable({
     seated &&
     state.phase === "bidding" &&
     state.currentSeat === mySeatIndex &&
-    state.bids[mySeatIndex] === null &&
-    biddingReady
+    biddingReady &&
+    (isOhHell(state) ? state.bids[mySeatIndex] === null : isBridge(state))
   const showRoundEnd = state.phase === "round-end" && role !== "unknown"
   const lastRound = state.history[state.history.length - 1]
   const waitingToContinue =
@@ -433,6 +458,25 @@ function ReadyTable({
     const seat = state.seats.find((item) => item.playerId === event.playerId)
     if (seat) emotesBySeat[seat.index] = { id: event.id, emote: event.emote }
   }
+
+  const roundEndRows = (() => {
+    if (!lastRound) return []
+    if (isOhHell(state) && "scores" in lastRound) {
+      return state.seats.map((seat) => ({
+        seat: seat.index,
+        name: seat.displayName ?? `Player ${seat.index + 1}`,
+        score: lastRound.scores[seat.index] ?? 0,
+      }))
+    }
+    if (isBridge(state) && "net" in lastRound) {
+      const play = playFromHistory(state.history)
+      return [
+        { seat: 0, name: "NS", score: sidePoints(play, "NS") },
+        { seat: 1, name: "EW", score: sidePoints(play, "EW") },
+      ]
+    }
+    return []
+  })()
 
   useContinuePrompt(waitingToContinue, onAdvanceTrick)
   useJoinPrompt({
@@ -449,11 +493,7 @@ function ReadyTable({
   })
   useRoundEndPrompt({
     active: showRoundEnd,
-    rows: (lastRound ? state.seats : []).map((seat) => ({
-      seat: seat.index,
-      name: seat.displayName ?? `Player ${seat.index + 1}`,
-      score: lastRound?.scores[seat.index] ?? 0,
-    })),
+    rows: roundEndRows,
     onContinue,
   })
   useGameOverPrompt({
@@ -490,8 +530,11 @@ function ReadyTable({
           role === "player" && state.phase === "lobby" ? onLeave : undefined
         }
       />
-      {myTurnToBid && mySeatIndex !== null && (
+      {myTurnToBid && mySeatIndex !== null && isOhHell(state) && (
         <BidPanel state={state} seat={mySeatIndex} onBid={onBid} />
+      )}
+      {myTurnToBid && mySeatIndex !== null && isBridge(state) && (
+        <BridgeBidPanel state={state} seat={mySeatIndex} onCall={onCall} />
       )}
       {actionError && (
         <p className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/40 px-3 py-1 text-xs text-red-100">

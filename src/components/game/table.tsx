@@ -3,9 +3,12 @@
 import { useState } from "react";
 import type { TableEmote } from "@/lib/emotes";
 import { rulesLine } from "@/lib/game/rules";
-import { trickWinner } from "@/lib/game/engine";
+import { trickWinner } from "@/lib/game/actions";
 import { displayGameTitle } from "@/lib/game/title";
 import type { Card, GameSettings, GameState } from "@/lib/game/types";
+import { isBridge, isOhHell } from "@/lib/game/types";
+import { sideForSeat } from "@/lib/bridge/types";
+import { canControlSeat, flippedTrump, trumpForTrickWinner } from "@/lib/game/view";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -13,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { TableMotion } from "@/hooks/use-table-motion";
+import { BridgeScoreboard } from "@/components/bridge/score-sheet";
 import { PlayerSeat, slotFor } from "./player-seat";
 import { Scoreboard } from "./score-sheet";
 import { DealOverlay } from "./deal-overlay";
@@ -66,12 +70,12 @@ export function GameTable({
       state.phase === "round-end" ||
       state.phase === "game-over") &&
     state.lastTrick.length > 0
-      ? trickWinner(state.lastTrick, state.trump)
+      ? trickWinner(state.lastTrick, trumpForTrickWinner(state))
       : null;
   const trickWinnerSeat = motion.trickWinnerSeat ?? heldTrickWinner;
   const trumpCard =
-    !motion.enteringDeal && state.trump && motion.trumpPhase !== "hidden"
-      ? state.trump
+    !motion.enteringDeal && flippedTrump(state) && motion.trumpPhase !== "hidden"
+      ? flippedTrump(state)
       : null;
 
   return (
@@ -118,7 +122,13 @@ export function GameTable({
             (state.phase === "trick-end" || state.phase === "round-end") &&
             !motion.trickLeaving
           }
-          takenByUs={mySeat === null || trickWinnerSeat === mySeat}
+          takenByUs={
+            mySeat === null ||
+            trickWinnerSeat === null ||
+            trickWinnerSeat === mySeat ||
+            (isBridge(state) &&
+              sideForSeat(trickWinnerSeat) === sideForSeat(mySeat))
+          }
         />
 
         {state.seats.map((seat) => {
@@ -155,8 +165,11 @@ export function GameTable({
               onSwapSeats={onSwapSeats}
               onLeave={self ? onLeave : undefined}
               onEmote={self && canEmote ? onEmote : undefined}
+              controllerSeat={mySeat}
               onPlay={
-                self && state.phase === "playing" && !motion.dealing
+                state.phase === "playing" &&
+                !motion.dealing &&
+                canControlSeat(state, mySeat, seat.index)
                   ? onPlay
                   : undefined
               }
@@ -165,7 +178,11 @@ export function GameTable({
         })}
 
         <DealOverlay shuffling={motion.shuffling} />
-        <Scoreboard state={state} />
+        {isBridge(state) ? (
+          <BridgeScoreboard state={state} mySeat={mySeat} />
+        ) : isOhHell(state) ? (
+          <Scoreboard state={state} />
+        ) : null}
       </div>
     </PlayOriginProvider>
   );

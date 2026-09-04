@@ -1,4 +1,5 @@
-import type { Card, GameState, Seat } from "../types"
+import type { Card, Seat } from "@/lib/game/types"
+import type { OhHellState as GameState } from "../types"
 import { legalBids, wouldBeLegalPlay } from "../engine"
 import { TRAINED_BOT_PARAMS, type BotParams } from "./params"
 import { makeHeuristicBot, heuristicPlay } from "./policy"
@@ -9,7 +10,7 @@ export function isBotSeat(seat: Seat) {
 }
 
 export function shouldRunBotController(
-  state: GameState,
+  state: { seats: Seat[] },
   mySeatIndex: number | null,
   opts?: { playerId?: string; onlineIds?: string[] }
 ) {

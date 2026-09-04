@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { motion, useReducedMotion } from "motion/react"
 
-export const DEAL_FLIGHT_MS = 480
+export const DEAL_FLIGHT_MS = 200
 
 export function DealIn({
   delayMs,

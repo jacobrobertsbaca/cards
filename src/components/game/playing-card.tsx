@@ -23,6 +23,8 @@ export function PlayingCard({
   disabled = false,
   onClick,
   className,
+  /** CSS hover nudge — turn off when the parent fan owns lift. */
+  liftOnHover = true,
 }: {
   card?: Card
   faceDown?: boolean
@@ -31,23 +33,38 @@ export function PlayingCard({
   disabled?: boolean
   onClick?: () => void
   className?: string
+  liftOnHover?: boolean
 }) {
   const red = card?.suit === "hearts" || card?.suit === "diamonds"
+  // Prefer a real button when clickable. Never use the native `disabled`
+  // attribute for overlapping fans — disabled elements are skipped in hit
+  // testing, so clicks fall through to the wrong card underneath.
   const Tag = onClick ? "button" : "div"
 
   return (
     <Tag
       type={onClick ? "button" : undefined}
-      onClick={onClick}
-      disabled={onClick ? disabled : undefined}
+      onClick={
+        onClick
+          ? (event) => {
+              if (disabled) {
+                event.preventDefault()
+                return
+              }
+              onClick()
+            }
+          : undefined
+      }
+      aria-disabled={onClick && disabled ? true : undefined}
       className={cn(
-        "relative isolate shrink-0 border shadow-md transition-transform duration-200 outline-none disabled:opacity-100",
+        "relative isolate shrink-0 border shadow-md transition-transform duration-200 outline-none",
         SIZES[size],
         faceDown
           ? "border-[#1b2a4a] bg-[#243868] card-back"
           : "border-black/5 bg-[#fbfaf6]",
         onClick &&
           !disabled &&
+          liftOnHover &&
           "[@media(hover:hover)]:hover:-translate-y-2 [@media(hover:hover)]:hover:shadow-lg",
         selected && "border-transparent ring-[3px] ring-amber-300",
         disabled && "brightness-[0.55] saturate-50",
@@ -101,6 +118,7 @@ export function CardFan({
   rotate = 0,
   dealing = false,
   dealDelays,
+  className,
 }: {
   count?: number
   cards?: Card[]
@@ -109,6 +127,7 @@ export function CardFan({
   rotate?: number
   dealing?: boolean
   dealDelays?: number[]
+  className?: string
 }) {
   const items = cards ?? Array.from({ length: count ?? 0 })
   const spec = FAN_CARD[size]
@@ -117,54 +136,56 @@ export function CardFan({
   const height = spec.h + sample.depth
 
   return (
-    <div
-      className="relative"
-      style={{
-        width,
-        height,
-        transform: `rotate(${rotate}deg)`,
-      }}
-    >
-      {items.map((card, index) => {
-        const pose = fanPose(items.length, index, spec.radius, spec.maxHalfAngle)
-        const key = card ? `${card.rank}${card.suit}` : index
-        const delayMs = dealing ? dealDelays?.[index] : undefined
-        return (
-          <div
-            key={key}
-            className="absolute bottom-0 left-1/2 origin-bottom"
-            style={{ zIndex: index }}
-          >
-            <motion.div
-              className="origin-bottom"
-              initial={false}
-              animate={{
-                x: pose.x,
-                y: pose.y - pose.depth,
-                rotate: pose.rotate,
-              }}
-              transition={
-                dealing
-                  ? { type: "spring", stiffness: 420, damping: 32, mass: 0.7 }
-                  : {
-                      type: "tween",
-                      duration: 0.34,
-                      ease: [0.22, 1, 0.36, 1],
-                    }
-              }
-              style={{ marginLeft: "-50%" }}
+    <div className={cn(className)}>
+      <div
+        className="relative"
+        style={{
+          width,
+          height,
+          transform: `rotate(${rotate}deg)`,
+        }}
+      >
+        {items.map((card, index) => {
+          const pose = fanPose(items.length, index, spec.radius, spec.maxHalfAngle)
+          const key = card ? `${card.rank}${card.suit}` : index
+          const delayMs = dealing ? dealDelays?.[index] : undefined
+          return (
+            <div
+              key={key}
+              className="absolute bottom-0 left-1/2 origin-bottom"
+              style={{ zIndex: index }}
             >
-              <DealIn delayMs={delayMs}>
-                <PlayingCard
-                  card={card}
-                  faceDown={faceDown || !card}
-                  size={size}
-                />
-              </DealIn>
-            </motion.div>
-          </div>
-        )
-      })}
+              <motion.div
+                className="origin-bottom"
+                initial={false}
+                animate={{
+                  x: pose.x,
+                  y: pose.y - pose.depth,
+                  rotate: pose.rotate,
+                }}
+                transition={
+                  dealing
+                    ? { type: "spring", stiffness: 420, damping: 32, mass: 0.7 }
+                    : {
+                        type: "tween",
+                        duration: 0.34,
+                        ease: [0.22, 1, 0.36, 1],
+                      }
+                }
+                style={{ marginLeft: "-50%" }}
+              >
+                <DealIn delayMs={delayMs}>
+                  <PlayingCard
+                    card={card}
+                    faceDown={faceDown || !card}
+                    size={size}
+                  />
+                </DealIn>
+              </motion.div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

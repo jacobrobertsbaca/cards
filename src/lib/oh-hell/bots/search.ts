@@ -1,4 +1,4 @@
-import { sameCard } from "../cards"
+import { sameCard } from "@/lib/game/cards"
 import {
   continueTrick,
   legalBids,
@@ -8,7 +8,8 @@ import {
   wouldBeLegalPlay,
 } from "../engine"
 import { evaluateFormula } from "../formula"
-import type { Card, GameState } from "../types"
+import type { Card } from "@/lib/game/types"
+import type { OhHellState as GameState } from "../types"
 import { sampleOtherHands, withSampledHands } from "./belief"
 import type { BotBrain } from "./policy"
 import {

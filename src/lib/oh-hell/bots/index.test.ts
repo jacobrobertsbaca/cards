@@ -10,7 +10,7 @@ import {
   startGame,
   wouldBeLegalPlay,
 } from "../engine"
-import type { GameSettings } from "../types"
+import type { OhHellSettings as GameSettings } from "../types"
 import { chooseBid, choosePlay, shouldRunBotController } from "./index"
 
 const settings: GameSettings = {

@@ -13,7 +13,8 @@ export function defaultGameTitle(
   kind: GameSettings["kind"] = "oh-hell",
   date = new Date()
 ) {
-  const game = kind === "oh-hell" ? "Oh Hell" : "Game"
+  const game =
+    kind === "oh-hell" ? "Oh Hell" : kind === "bridge" ? "Bridge" : "Game"
   return `${timeOfDayLabel(date)} ${game}`
 }
 

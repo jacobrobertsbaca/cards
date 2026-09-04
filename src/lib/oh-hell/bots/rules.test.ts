@@ -9,7 +9,7 @@ import {
   startGame,
   wouldBeLegalPlay,
 } from "../engine"
-import type { GameSettings } from "../types"
+import type { OhHellSettings as GameSettings } from "../types"
 import { chooseBid, choosePlay } from "./index"
 import { TRAINED_BOT_PARAMS } from "./params"
 import { resetSearchBudget, setSearchBudget } from "./search"

@@ -7,7 +7,7 @@ import {
   prettyExpression,
   validateExpression,
   type MathToken,
-} from "@/lib/game/formula"
+} from "@/lib/oh-hell/formula"
 import type { ScoringFormula } from "@/lib/game/types"
 import {
   Tooltip,

@@ -59,7 +59,7 @@ export function TrickPile({
   const exit = winnerSlot ? exitOffset(winnerSlot) : { x: "0vw", y: "20vh" }
 
   return (
-    <div className="absolute top-1/2 left-1/2 z-20 flex h-44 w-40 -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+    <div className="absolute top-1/2 left-1/2 z-20 flex h-40 w-36 -translate-x-1/2 -translate-y-1/2 items-center justify-center md:h-44 md:w-40">
       {plays.map((play, index) => {
         const fromSlot = slotFor(
           seatCount,
@@ -73,7 +73,7 @@ export function TrickPile({
           <div
             key={playKey(play)}
             className={cn(
-              "absolute trick-rest",
+              "absolute trick-rest origin-center scale-[0.82] md:scale-100",
               leaving
                 ? "trick-out"
                 : index === plays.length - 1 && "play-fly"

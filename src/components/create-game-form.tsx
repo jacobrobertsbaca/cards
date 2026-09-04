@@ -18,9 +18,10 @@ import {
   settingsErrors,
 } from "@/components/game-settings-fields"
 import { gameCode } from "@/lib/codes"
-import { createGame, joinGame } from "@/lib/game/engine"
+import { createGame, joinGame } from "@/lib/game/actions"
 import { getIdentity } from "@/lib/identity"
-import { buildUpDown } from "@/lib/game/pattern"
+import { buildUpDown } from "@/lib/oh-hell/pattern"
+import { DEFAULT_BRIDGE_SETTINGS } from "@/lib/bridge/types"
 import {
   DEFAULT_FORMULA,
   type GameSettings,
@@ -29,18 +30,26 @@ import { rememberGame } from "@/lib/history"
 import { getGameStore } from "@/lib/store"
 import { gameTooltip } from "@/lib/game/rules"
 
-const items = [{ value: "oh-hell", label: "Oh Hell" }] as const
+const items = [
+  { value: "oh-hell", label: "Oh Hell" },
+  { value: "bridge", label: "Bridge" },
+] as const
 
-export function CreateGameForm() {
-  const router = useRouter()
-  const [settings, setSettings] = useState<GameSettings>({
+function defaultSettings(kind: GameSettings["kind"]): GameSettings {
+  if (kind === "bridge") return { ...DEFAULT_BRIDGE_SETTINGS }
+  return {
     kind: "oh-hell",
     seatCount: 2,
     pattern: buildUpDown(10),
     leadTrump: "after-broken",
     hook: true,
     scoring: DEFAULT_FORMULA,
-  })
+  }
+}
+
+export function CreateGameForm() {
+  const router = useRouter()
+  const [settings, setSettings] = useState<GameSettings>(defaultSettings("oh-hell"))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,13 +86,9 @@ export function CreateGameForm() {
         <Select
           value={settings.kind}
           onValueChange={(value) =>
-            value &&
-            setSettings((current) => ({
-              ...current,
-              kind: value as GameSettings["kind"],
-            }))
+            value && setSettings(defaultSettings(value as GameSettings["kind"]))
           }
-          items={items}
+          items={[...items]}
         >
           <SelectTrigger className="w-full">
             <SelectValue />

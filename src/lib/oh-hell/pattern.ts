@@ -1,4 +1,4 @@
-import { maxHandSize } from "./cards"
+import { maxHandSize } from "@/lib/game/cards"
 
 export const MIN_TRICKS = 1
 export const MAX_TRICKS = 10

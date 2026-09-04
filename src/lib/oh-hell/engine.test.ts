@@ -21,7 +21,7 @@ import {
   updateSettings,
 } from "./engine"
 import { evaluateFormula } from "./formula"
-import type { GameSettings } from "./types"
+import type { OhHellSettings as GameSettings } from "./types"
 
 function settings(overrides: Partial<GameSettings> = {}): GameSettings {
   return {

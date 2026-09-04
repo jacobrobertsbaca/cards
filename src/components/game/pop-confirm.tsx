@@ -1,9 +1,55 @@
 "use client"
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "motion/react"
 import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+/** Viewport-fixed confirm — portals out of transformed seat ancestors. */
+export function PlayConfirmDock({
+  show,
+  label,
+  onConfirm,
+  children,
+  placement = "south",
+}: {
+  show: boolean
+  label: string
+  onConfirm: () => void | Promise<void>
+  children: ReactNode
+  placement?: "south" | "north" | "east" | "west"
+}) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  if (!mounted) return null
+
+  return createPortal(
+    <div
+      className={cn(
+        "pointer-events-none fixed z-40",
+        placement === "south" &&
+          "bottom-[calc(13.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 md:bottom-[calc(12rem+env(safe-area-inset-bottom,0px))]",
+        placement === "north" &&
+          "top-[calc(13.25rem+env(safe-area-inset-top,0px))] left-1/2 -translate-x-1/2 md:top-[calc(14.75rem+env(safe-area-inset-top,0px))]",
+        placement === "east" &&
+          "top-1/2 right-[max(4.5rem,env(safe-area-inset-right))] -translate-y-1/2",
+        placement === "west" &&
+          "top-1/2 left-[max(4.5rem,env(safe-area-inset-left))] -translate-y-1/2"
+      )}
+    >
+      <PopConfirmButton
+        show={show}
+        label={label}
+        className="pointer-events-auto flex size-9 touch-manipulation items-center justify-center rounded-full bg-amber-200 text-[#16352b] shadow-[0_0_0_1px_rgb(251_191_36/0.45)] hover:bg-amber-100"
+        onConfirm={onConfirm}
+      >
+        {children}
+      </PopConfirmButton>
+    </div>,
+    document.body
+  )
+}
 
 export function PopConfirmButton({
   show,

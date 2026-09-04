@@ -1,6 +1,6 @@
 export type PastGame = {
   code: string
-  kind: "oh-hell"
+  kind: "oh-hell" | "bridge"
   title?: string
   startedAt: number
   lastSeenAt: number

@@ -9,7 +9,7 @@ import {
   patternLabel,
   samePattern,
   validatePattern,
-} from "@/lib/game/pattern"
+} from "@/lib/oh-hell/pattern"
 import { cn } from "@/lib/utils"
 
 const PRESETS = [

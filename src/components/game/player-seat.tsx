@@ -12,10 +12,16 @@ import {
   Shuffle,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { isLegalPlay } from "@/lib/game/engine";
+import { isLegalPlay } from "@/lib/game/actions";
 import { EMOTE_LABELS, TABLE_EMOTES, type TableEmote } from "@/lib/emotes";
 import type { Card, GameState, Seat } from "@/lib/game/types";
+import { isBridge, isOhHell } from "@/lib/game/types";
+import { isDummyRevealed } from "@/lib/game/view";
 import { cn } from "@/lib/utils";
+import {
+  BridgeAuctionBadge,
+  BridgePlayBadge,
+} from "@/components/bridge/auction-badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +42,7 @@ import {
 import { EmoteIcon } from "./emote-icon";
 import { DealIn } from "./deal-in";
 import { FAN_CARD, fanPose } from "./fan";
-import { PopConfirmButton } from "./pop-confirm";
+import { PlayConfirmDock } from "./pop-confirm";
 import { originFromElement, usePlayOrigin } from "./play-origin";
 import { CardFan, PlayingCard } from "./playing-card";
 
@@ -103,6 +109,7 @@ export function PlayerSeat({
   onLeave,
   onEmote,
   onPlay,
+  controllerSeat = null,
 }: {
   seat: Seat;
   state: GameState;
@@ -122,12 +129,17 @@ export function PlayerSeat({
   onLeave?: () => void;
   onEmote?: (emote: TableEmote) => void;
   onPlay?: (card: Card) => void | Promise<void | boolean>;
+  controllerSeat?: number | null;
 }) {
   const full = state.hands[seat.index] ?? [];
   const hand = revealCount === undefined ? full : full.slice(0, revealCount);
-  const bid = state.bids[seat.index];
+  const bid = isOhHell(state) ? state.bids[seat.index] : null;
   const tricks = state.tricks[seat.index];
-  const showFaces = self || spectating;
+  const dummyUp =
+    isBridge(state) &&
+    isDummyRevealed(state) &&
+    state.contract?.dummy === seat.index;
+  const showFaces = self || spectating || dummyUp;
   const isTurn =
     (state.phase === "playing" || state.phase === "bidding") &&
     state.currentSeat === seat.index;
@@ -139,45 +151,92 @@ export function PlayerSeat({
       className={cn(
         "pointer-events-none absolute z-10 flex",
         sideways
-          ? "flex-row items-center gap-2"
+          ? cn(
+              "flex-row items-center",
+              dummyUp
+                ? "-space-x-2 gap-0 md:gap-0 md:space-x-0"
+                : "gap-0 md:gap-2.5"
+            )
           : "max-w-[min(calc(100vw-7.5rem),48rem)] flex-col",
         SLOT_CLASS[slot]
       )}
     >
       {slot.startsWith("north") && (
-        <div className="mb-3">
-          <CardFan
-            count={hand.length}
-            cards={showFaces ? hand : undefined}
-            faceDown={!showFaces}
-            size="sm"
-            dealing={dealing}
-            dealDelays={dealDelays}
-          />
+        <div
+          className={cn(
+            "max-w-[min(96vw,42rem)]",
+            dummyUp ? "mb-2" : "mb-2 md:mb-3"
+          )}
+        >
+          {dummyUp ? (
+            <OwnHand
+              hand={hand}
+              state={state}
+              seat={seat.index}
+              controllerSeat={controllerSeat ?? seat.index}
+              dealing={dealing}
+              dealDelays={dealDelays}
+              onPlay={onPlay}
+              confirmPlacement="north"
+            />
+          ) : (
+            <CardFan
+              count={hand.length}
+              cards={showFaces ? hand : undefined}
+              faceDown={!showFaces}
+              size="sm"
+              dealing={dealing}
+              dealDelays={dealDelays}
+              className="origin-bottom md:scale-[1.22]"
+            />
+          )}
         </div>
       )}
       {slot === "east" && (
-        <SideHand slot="east">
-          <CardFan
-            count={hand.length}
-            cards={showFaces ? hand : undefined}
-            faceDown={!showFaces}
-            size="sm"
-            dealing={dealing}
-            dealDelays={dealDelays}
-          />
+        <SideHand slot="east" roomy={dummyUp}>
+          {dummyUp ? (
+            <OwnHand
+              hand={hand}
+              state={state}
+              seat={seat.index}
+              controllerSeat={controllerSeat ?? seat.index}
+              dealing={dealing}
+              dealDelays={dealDelays}
+              onPlay={onPlay}
+              compact
+              confirmPlacement="east"
+            />
+          ) : (
+            <CardFan
+              count={hand.length}
+              cards={showFaces ? hand : undefined}
+              faceDown={!showFaces}
+              size="sm"
+              dealing={dealing}
+              dealDelays={dealDelays}
+              className="origin-center md:scale-[1.22]"
+            />
+          )}
         </SideHand>
       )}
 
       <div
         className={cn(
           "relative",
-          slot === "south" ? "mt-1 mb-7 md:mb-6" : "my-1",
+          slot === "south"
+            ? dummyUp
+              ? "mt-1 mb-2.5"
+              : "mt-1 mb-7 md:mb-6"
+            : dummyUp
+              ? "my-1.5"
+              : "my-1",
           // Keep writing-mode on the sizing box for side seats. Without it,
           // WebKit (iOS) sizes this wrapper like horizontal text and the
           // vertical name hugs the right edge — clipping east seats.
-          (slot === "west" || slot === "east") &&
-            "w-max [writing-mode:vertical-rl]"
+          // Sideways text-orientation + svg rotate keep bot/suit/menu icons
+          // aligned with the vertical seat chrome.
+          sideways &&
+            "w-max [writing-mode:vertical-rl] [text-orientation:sideways] [&_svg]:rotate-90"
         )}
       >
         {emote && (
@@ -249,7 +308,7 @@ export function PlayerSeat({
                 )}
               />
             )}
-            <span className="inline-flex items-center ">
+            <span className="inline-flex items-center">
               {onEmote && <EmoteMenu onEmote={onEmote} />}
               {(canManageBots || (self && onLeave)) && (
                 <SeatMenu
@@ -262,35 +321,74 @@ export function PlayerSeat({
                 />
               )}
             </span>
+            {state.phase !== "lobby" &&
+              (isOhHell(state) ? (
+                <BidIndicator bid={bid} tricks={tricks} />
+              ) : isBridge(state) && state.phase === "bidding" ? (
+                <BridgeAuctionBadge state={state} seatIndex={seat.index} />
+              ) : isBridge(state) ? (
+                <BridgePlayBadge
+                  state={state}
+                  seatIndex={seat.index}
+                  tricks={tricks}
+                />
+              ) : null)}
           </span>
-          {state.phase !== "lobby" && (
-            <BidIndicator bid={bid} tricks={tricks} />
-          )}
         </div>
       </div>
 
       {slot === "west" && (
-        <SideHand slot="west">
-          <CardFan
-            count={hand.length}
-            cards={showFaces ? hand : undefined}
-            faceDown={!showFaces}
-            size="sm"
-            dealing={dealing}
-            dealDelays={dealDelays}
-          />
+        <SideHand slot="west" roomy={dummyUp}>
+          {dummyUp ? (
+            <OwnHand
+              hand={hand}
+              state={state}
+              seat={seat.index}
+              controllerSeat={controllerSeat ?? seat.index}
+              dealing={dealing}
+              dealDelays={dealDelays}
+              onPlay={onPlay}
+              compact
+              confirmPlacement="west"
+            />
+          ) : (
+            <CardFan
+              count={hand.length}
+              cards={showFaces ? hand : undefined}
+              faceDown={!showFaces}
+              size="sm"
+              dealing={dealing}
+              dealDelays={dealDelays}
+              className="origin-center md:scale-[1.22]"
+            />
+          )}
         </SideHand>
       )}
 
       {slot === "south" &&
-        (showFaces ? (
+        (dummyUp ? (
+          <div className="pt-1.5">
+            <OwnHand
+              hand={hand}
+              state={state}
+              seat={seat.index}
+              controllerSeat={controllerSeat ?? seat.index}
+              dealing={dealing}
+              dealDelays={dealDelays}
+              onPlay={onPlay}
+              confirmPlacement="south"
+            />
+          </div>
+        ) : showFaces ? (
           <OwnHand
             hand={hand}
             state={state}
             seat={seat.index}
+            controllerSeat={controllerSeat ?? seat.index}
             dealing={dealing}
             dealDelays={dealDelays}
             onPlay={onPlay}
+            confirmPlacement="south"
           />
         ) : (
           <div className="flex items-end justify-center pt-1">
@@ -300,6 +398,7 @@ export function PlayerSeat({
               size="lg"
               dealing={dealing}
               dealDelays={dealDelays}
+              className="origin-bottom md:scale-[1.12]"
             />
           </div>
         ))}
@@ -311,16 +410,22 @@ function OwnHand({
   hand,
   state,
   seat,
+  controllerSeat,
   dealing,
   dealDelays,
   onPlay,
+  compact = false,
+  confirmPlacement = "south",
 }: {
   hand: Card[];
   state: GameState;
   seat: number;
+  controllerSeat: number;
   dealing?: boolean;
   dealDelays?: number[];
   onPlay?: (card: Card) => void | Promise<void | boolean>;
+  compact?: boolean;
+  confirmPlacement?: "south" | "north" | "east" | "west";
 }) {
   const confirmToPlay = useCoarsePointer();
   const playOrigin = usePlayOrigin();
@@ -329,16 +434,20 @@ function OwnHand({
   const [picked, setPicked] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
-  const spec = confirmToPlay
-    ? { ...FAN_CARD.lg, radius: 300, maxHalfAngle: 12 }
-    : { ...FAN_CARD.xl, maxHalfAngle: 18 };
-  const gap = confirmToPlay ? 2.6 : 1.6;
-  const cardSize = confirmToPlay ? "lg" : "xl";
+  const spec = compact
+    ? { ...FAN_CARD.md, radius: 240, maxHalfAngle: 16 }
+    : confirmToPlay
+      ? { ...FAN_CARD.lg, radius: 320, maxHalfAngle: 15 }
+      : { ...FAN_CARD.xl, maxHalfAngle: 18 };
+  const gap = compact ? 2.1 : confirmToPlay ? 3.2 : 1.6;
+  const cardSize = compact ? "md" : confirmToPlay ? "lg" : "xl";
   const sample = fanPose(hand.length, 0, spec.radius, spec.maxHalfAngle, gap);
   const width = Math.max(spec.w, 2 * Math.abs(sample.x) + spec.w);
   const height = spec.h + sample.depth;
   const ourTurn =
-    Boolean(onPlay) && state.phase === "playing" && state.currentSeat === seat;
+    Boolean(onPlay) &&
+    state.phase === "playing" &&
+    state.currentSeat === seat;
 
   useEffect(() => {
     setPicked(null);
@@ -353,7 +462,7 @@ function OwnHand({
 
   async function playNow(card: Card) {
     if (!onPlay || pendingRef.current) return;
-    if (!isLegalPlay(state, seat, card)) return;
+    if (!isLegalPlay(state, controllerSeat, card)) return;
     pendingRef.current = true;
     rememberOrigin(card);
     setPending(true);
@@ -368,7 +477,9 @@ function OwnHand({
 
   const selectedCard = picked !== null ? hand[picked] ?? null : null;
   const canPlaySelected =
-    selectedCard !== null && ourTurn && isLegalPlay(state, seat, selectedCard);
+    selectedCard !== null &&
+    ourTurn &&
+    isLegalPlay(state, controllerSeat, selectedCard);
 
   return (
     <div>
@@ -382,7 +493,7 @@ function OwnHand({
         onMouseLeave={() => setHover(null)}
       >
         {hand.map((card, index) => {
-          const canPlay = ourTurn && isLegalPlay(state, seat, card);
+          const canPlay = ourTurn && isLegalPlay(state, controllerSeat, card);
           const pose = fanPose(
             hand.length,
             index,
@@ -396,79 +507,92 @@ function OwnHand({
               ? 0
               : Math.sign(index - spreadFrom) *
                 neighborPush(Math.abs(index - spreadFrom));
-          const lift = !confirmToPlay && hover === index ? -6 : 0;
+          const maxLift = 6;
+          const lift = !confirmToPlay && hover === index ? maxLift : 0;
           const delayMs = dealing ? dealDelays?.[index] : undefined;
+          const fanTransition = dealing
+            ? { type: "spring" as const, stiffness: 420, damping: 32, mass: 0.7 }
+            : {
+                type: "tween" as const,
+                duration: 0.34,
+                ease: [0.22, 1, 0.36, 1] as const,
+              };
           return (
+            // Zero-size anchor at the fan origin. Full-size wrappers here used to
+            // stack at center and steal hits from cards transformed away.
             <div
               key={`${card.rank}${card.suit}`}
-              ref={(node) => {
-                const key = `${card.rank}${card.suit}`;
-                if (node) cardNodes.current.set(key, node);
-                else cardNodes.current.delete(key);
-              }}
-              className="absolute bottom-0 left-1/2 origin-bottom"
-              onMouseEnter={() => setHover(index)}
-              style={{ zIndex: index, isolation: "isolate" }}
+              className="pointer-events-none absolute bottom-0 left-1/2"
+              style={{ zIndex: index }}
             >
               <motion.div
-                className="origin-bottom"
+                className="origin-bottom pointer-events-auto"
                 initial={false}
                 animate={{
-                  x: pose.x + spread,
-                  y: pose.y - pose.depth + lift,
+                  // Hit target stays on the base fan pose — spread/lift are visual
+                  // only, otherwise edge hover jitters as neighbors move.
+                  x: pose.x - spec.w / 2,
+                  y: pose.y - pose.depth,
                   rotate: pose.rotate,
                 }}
-                transition={
-                  dealing
-                    ? { type: "spring", stiffness: 420, damping: 32, mass: 0.7 }
-                    : {
-                        type: "tween",
-                        duration: 0.34,
-                        ease: [0.22, 1, 0.36, 1],
-                      }
-                }
-                style={{ marginLeft: "-50%" }}
+                transition={fanTransition}
+                onMouseEnter={() => setHover(index)}
+                style={{
+                  paddingTop: maxLift,
+                  marginTop: -maxLift,
+                }}
               >
-                <DealIn delayMs={delayMs}>
-                  <PlayingCard
-                    card={card}
-                    size={cardSize}
-                    selected={picked === index}
-                    disabled={ourTurn && !canPlay}
-                    onClick={
-                      canPlay
-                        ? () => {
-                            if (pendingRef.current) return;
-                            if (confirmToPlay) {
-                              setPicked((current) =>
-                                current === index ? null : index
-                              );
-                              return;
+                <motion.div
+                  ref={(node) => {
+                    const key = `${card.rank}${card.suit}`;
+                    if (node) cardNodes.current.set(key, node);
+                    else cardNodes.current.delete(key);
+                  }}
+                  className="origin-bottom"
+                  initial={false}
+                  animate={{ x: spread, y: -lift }}
+                  transition={fanTransition}
+                >
+                  <DealIn delayMs={delayMs}>
+                    <PlayingCard
+                      card={card}
+                      size={cardSize}
+                      selected={picked === index}
+                      disabled={ourTurn && !canPlay}
+                      onClick={
+                        ourTurn
+                          ? () => {
+                              if (!canPlay || pendingRef.current) return;
+                              if (confirmToPlay) {
+                                setPicked((current) =>
+                                  current === index ? null : index
+                                );
+                                return;
+                              }
+                              void playNow(card);
                             }
-                            void playNow(card);
-                          }
-                        : undefined
-                    }
-                    className="touch-manipulation hover:translate-y-0"
-                  />
-                </DealIn>
+                          : undefined
+                      }
+                      className="touch-manipulation"
+                      liftOnHover={false}
+                    />
+                  </DealIn>
+                </motion.div>
               </motion.div>
             </div>
           );
         })}
       </div>
-      <div className="pointer-events-none fixed bottom-[calc(12rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 -translate-x-1/2">
-        <PopConfirmButton
-          show={confirmToPlay && canPlaySelected}
-          label="Play selected card"
-          className="pointer-events-auto flex size-9 touch-manipulation items-center justify-center rounded-full bg-amber-200 text-[#16352b] shadow-[0_0_0_1px_rgb(251_191_36/0.45)] hover:bg-amber-100"
-          onConfirm={() => {
-            if (selectedCard) return playNow(selectedCard);
-          }}
-        >
-          <Check className="size-4" strokeWidth={2.75} />
-        </PopConfirmButton>
-      </div>
+      <PlayConfirmDock
+        show={confirmToPlay && canPlaySelected}
+        label="Play selected card"
+        placement={confirmPlacement}
+        onConfirm={() => {
+          if (selectedCard) return playNow(selectedCard);
+        }}
+      >
+        <Check className="size-4" strokeWidth={2.75} />
+      </PlayConfirmDock>
     </div>
   );
 }
@@ -482,12 +606,28 @@ function neighborPush(distance: number) {
 function SideHand({
   slot,
   children,
+  roomy = false,
 }: {
   slot: "west" | "east";
   children: ReactNode;
+  /** Wider/taller box so a readable dummy fan fits after rotation. */
+  roomy?: boolean;
 }) {
   return (
-    <div className="flex h-48 w-22 shrink-0 items-center justify-center overflow-visible">
+    <div
+      className={cn(
+        "flex shrink-0 items-center overflow-visible",
+        // Pull the fan toward the name badge (indicator sits inside of E/W).
+        slot === "east" ? "justify-end" : "justify-start",
+        roomy && slot === "east" && "-mr-12 md:-mr-5",
+        roomy && slot === "west" && "-ml-12 md:-ml-5",
+        !roomy && slot === "east" && "-mr-4 md:mr-0",
+        !roomy && slot === "west" && "-ml-4 md:ml-0",
+        roomy
+          ? "h-[min(70vh,30rem)] w-8 md:w-24"
+          : "h-48 w-16 md:w-28 md:justify-center"
+      )}
+    >
       <div
         className={cn(
           "overflow-visible",
@@ -630,7 +770,7 @@ function BidIndicator({ bid, tricks }: { bid: number | null; tricks: number }) {
     <Tooltip>
       <TooltipTrigger
         delay={200}
-        className="pointer-events-auto text-[10px] leading-none tabular-nums text-white/50"
+        className="pointer-events-auto text-[11px] leading-none font-semibold tabular-nums text-white/80 md:text-xs"
       >
         {tricks}
         <span className="text-white/30">/</span>

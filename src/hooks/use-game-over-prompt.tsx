@@ -2,8 +2,10 @@
 
 import { useEffect, useRef } from "react"
 import { toast } from "sonner"
-import { ranking } from "@/lib/game/engine"
+import { ranking } from "@/lib/game/actions"
 import type { GameState } from "@/lib/game/types"
+import { isBridge, isOhHell } from "@/lib/game/types"
+import { playFromHistory, rubberWinners, sidePoints } from "@/lib/bridge/scoring"
 
 const TOAST_ID = "game-over"
 
@@ -19,7 +21,18 @@ export function useGameOverPrompt({
   const dismissed = useRef(false)
   const onRematchRef = useRef(onRematch)
   onRematchRef.current = onRematch
-  const standings = ranking(state)
+
+  const standings = (() => {
+    if (isOhHell(state)) return ranking(state)
+    if (isBridge(state)) {
+      const play = playFromHistory(state.history)
+      return [
+        { seat: 0, name: "NS", score: sidePoints(play, "NS") },
+        { seat: 1, name: "EW", score: sidePoints(play, "EW") },
+      ]
+    }
+    return []
+  })()
   const signature = standings
     .map((row) => `${row.seat}:${row.name}:${row.score}`)
     .join("|")
@@ -32,7 +45,12 @@ export function useGameOverPrompt({
     }
     if (dismissed.current) return
 
-    toast("Game over!", {
+    const title =
+      isBridge(state) && rubberWinners(playFromHistory(state.history)).length === 1
+        ? `${rubberWinners(playFromHistory(state.history))[0]} wins the rubber!`
+        : "Game over!"
+
+    toast(title, {
       id: TOAST_ID,
       duration: Infinity,
       dismissible: true,
@@ -69,5 +87,5 @@ export function useGameOverPrompt({
     return () => {
       toast.dismiss(TOAST_ID)
     }
-  }, [active, signature])
+  }, [active, signature, state])
 }

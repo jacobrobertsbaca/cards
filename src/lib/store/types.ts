@@ -2,7 +2,7 @@ import type { GameState } from "@/lib/game/types"
 
 export type GameRecord = {
   code: string
-  kind: "oh-hell"
+  kind: "oh-hell" | "bridge"
   state: GameState
   version: number
 }

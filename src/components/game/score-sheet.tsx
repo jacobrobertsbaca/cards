@@ -1,8 +1,8 @@
 "use client";
 
 import { ClipboardList } from "lucide-react";
-import { ranking } from "@/lib/game/engine";
-import type { GameState } from "@/lib/game/types";
+import { ranking } from "@/lib/game/actions";
+import type { OhHellState } from "@/lib/oh-hell/types";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -29,7 +29,7 @@ export function Scoreboard({
   state,
   className,
 }: {
-  state: GameState;
+  state: OhHellState;
   className?: string;
 }) {
   const standings = ranking(state);
@@ -65,7 +65,7 @@ export function Scoreboard({
   );
 }
 
-function ScoreTable({ state }: { state: GameState }) {
+function ScoreTable({ state }: { state: OhHellState }) {
   const standings = ranking(state);
 
   return (

@@ -1,9 +1,10 @@
-import { createDeck, sameCard, shuffle, sortHand, rankValue } from "./cards";
+import { createDeck, sameCard, shuffle, sortHand, rankValue } from "@/lib/game/cards";
 import { evaluateFormula } from "./formula";
-import { randomBotName } from "../names";
+import { randomBotName } from "@/lib/names";
 import { validatePattern } from "./pattern";
-import { defaultGameTitle } from "./title";
-import type { Card, GameSettings, GameState, TrickPlay } from "./types";
+import { defaultGameTitle } from "@/lib/game/title";
+import type { Card, TrickPlay } from "@/lib/game/types"
+import type { OhHellSettings as GameSettings, OhHellState as GameState } from "./types";
 
 export class GameError extends Error {
   constructor(message: string) {
