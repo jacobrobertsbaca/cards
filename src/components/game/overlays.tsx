@@ -21,8 +21,8 @@ export function BidPanel({
   const [pending, setPending] = useState(false)
 
   return (
-    <div className="pointer-events-auto absolute inset-x-0 bottom-[calc(12rem+env(safe-area-inset-bottom,0px))] z-40 flex justify-center px-2 md:bottom-[15rem]">
-      <div className="flex w-full max-w-[min(24rem,calc(100vw-1rem))] items-center justify-center gap-1.5">
+    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(12rem+env(safe-area-inset-bottom,0px))] z-40 flex justify-center px-2 md:bottom-[15rem]">
+      <div className="pointer-events-auto flex w-full max-w-[min(24rem,calc(100vw-1rem))] items-center justify-center gap-1.5">
         <div
           className={cn(
             "flex min-w-0 flex-1 items-center justify-center gap-0.5 rounded-full bg-black/25 p-1 backdrop-blur-sm md:flex-none md:gap-1.5 md:p-1.5",

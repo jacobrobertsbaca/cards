@@ -120,10 +120,10 @@ export function BridgeBidPanel({
   const bidding = picked?.type === "bid";
 
   return (
-    <div className="pointer-events-auto absolute inset-x-0 bottom-[calc(13.5rem+env(safe-area-inset-bottom,0px))] z-40 flex justify-center px-2 md:bottom-[15rem]">
+    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(13.5rem+env(safe-area-inset-bottom,0px))] z-40 flex justify-center px-2 md:bottom-[15rem]">
       <div
         className={cn(
-          "relative flex w-fit flex-col items-center",
+          "pointer-events-auto relative flex w-fit flex-col items-center",
           pending && "pointer-events-none opacity-55"
         )}
       >
