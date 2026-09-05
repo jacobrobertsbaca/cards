@@ -48,7 +48,7 @@ export function GameSettingsFields({
             href="https://en.wikipedia.org/wiki/Bridge_scoring#Rubber_bridge"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline underline-offset-3 hover:text-foreground"
+            className="pointer-events-auto underline underline-offset-3 hover:text-foreground"
           >
             Standard scoring rules
           </a>{" "}

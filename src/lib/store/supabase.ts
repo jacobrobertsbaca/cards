@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GameState } from "@/lib/game/types"
 import {
   VersionConflictError,
+  type ChatDraft,
+  type ChatMessage,
   type EmoteEvent,
   type GameRecord,
   type GameStore,
@@ -14,12 +16,32 @@ type GameRow = {
   version: number
 }
 
+type MessageRow = {
+  id: string
+  game_code: string
+  player_id: string
+  player_name: string
+  body: string
+  created_at: string
+}
+
 function toRecord(row: GameRow): GameRecord {
   return {
     code: row.code,
     kind: row.kind,
     state: row.state,
     version: row.version,
+  }
+}
+
+function toMessage(row: MessageRow): ChatMessage {
+  return {
+    id: row.id,
+    gameCode: row.game_code,
+    playerId: row.player_id,
+    playerName: row.player_name,
+    body: row.body,
+    createdAt: row.created_at,
   }
 }
 
@@ -60,6 +82,31 @@ export function createSupabaseStore(client: SupabaseClient): GameStore {
       if (!data) throw new VersionConflictError()
       return toRecord(data as GameRow)
     },
+    async listMessages(code) {
+      const { data, error } = await client
+        .from("game_messages")
+        .select("id, game_code, player_id, player_name, body, created_at")
+        .eq("game_code", code)
+        .order("created_at", { ascending: true })
+        .limit(200)
+      if (error) throw error
+      return ((data as MessageRow[] | null) ?? []).map(toMessage)
+    },
+    async sendMessage(code, draft: ChatDraft) {
+      const { data, error } = await client
+        .from("game_messages")
+        .insert({
+          id: draft.id,
+          game_code: code,
+          player_id: draft.playerId,
+          player_name: draft.playerName,
+          body: draft.body,
+        })
+        .select("id, game_code, player_id, player_name, body, created_at")
+        .single()
+      if (error) throw error
+      return toMessage(data as MessageRow)
+    },
     connect(code, playerId, handlers) {
       const channel = client.channel(`game:${code}`, {
         config: { presence: { key: playerId } },
@@ -91,6 +138,20 @@ export function createSupabaseStore(client: SupabaseClient): GameStore {
           (payload) => {
             const row = (payload.new ?? payload.old) as GameRow | null
             if (row?.state) handlers.onChange(toRecord(row))
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "game_messages",
+            filter: `game_code=eq.${code}`,
+          },
+          (payload) => {
+            const row = payload.new as MessageRow | null
+            if (!row?.id || !row.player_id || !row.body) return
+            handlers.onChat(toMessage(row))
           }
         )
         .on("presence", { event: "sync" }, publishPresence)

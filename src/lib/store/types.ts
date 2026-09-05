@@ -22,15 +22,32 @@ export type EmoteEvent = {
   emote: string
 }
 
+export type ChatMessage = {
+  id: string
+  gameCode: string
+  playerId: string
+  playerName: string
+  body: string
+  createdAt: string
+}
+
 export type RoomHandlers = {
   onChange: (record: GameRecord) => void
   onPresence: PresenceHandler
   onEmote: (event: EmoteEvent) => void
+  onChat: (message: ChatMessage) => void
 }
 
 export type RoomConnection = {
   sendEmote: (event: EmoteEvent) => void
   disconnect: () => void
+}
+
+export type ChatDraft = {
+  id: string
+  playerId: string
+  playerName: string
+  body: string
 }
 
 export interface GameStore {
@@ -41,6 +58,8 @@ export interface GameStore {
     state: GameState,
     expectedVersion: number
   ): Promise<GameRecord>
+  listMessages(code: string): Promise<ChatMessage[]>
+  sendMessage(code: string, draft: ChatDraft): Promise<ChatMessage>
   connect(
     code: string,
     playerId: string,

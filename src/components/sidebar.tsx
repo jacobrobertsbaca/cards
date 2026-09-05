@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type MouseEvent } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Check, Pencil, Plus, X } from "lucide-react"
+import { Check, Pencil, Plus, Settings, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -13,6 +13,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { useGameSettingsApi } from "@/components/game/settings-context"
+import { SidebarToggleIcon } from "@/components/sidebar-toggle-icon"
 import { useHistory } from "@/hooks/use-history"
 import { useIdentity } from "@/hooks/use-identity"
 import { displayGameTitle } from "@/lib/game/title"
@@ -20,7 +22,6 @@ import { historyTooltip } from "@/lib/game/rules"
 import { forgetGame } from "@/lib/history"
 import { setDisplayName } from "@/lib/identity"
 import { cn } from "@/lib/utils"
-import { SidebarToggleIcon } from "@/components/sidebar-toggle-icon"
 
 export const SIDEBAR_WIDTH = "w-56"
 export const SIDEBAR_EXPANDED_INSET = "14rem"
@@ -45,18 +46,39 @@ export function AppSidebar({
   const [hovered, setHovered] = useState(false)
   const expanded = pinned || hovered
 
-  function togglePinned() {
-    onPinnedChange(!pinned)
+  function openHover() {
+    setHovered(true)
   }
 
-  function closeHover() {
-    if (!pinned) setHovered(false)
+  function closeHover(event: MouseEvent<HTMLDivElement>) {
+    if (pinned) return
+    const panel = event.currentTarget
+    const related = event.relatedTarget
+    if (related instanceof Node && panel.contains(related)) return
+
+    const { clientX, clientY } = event
+    window.requestAnimationFrame(() => {
+      if (pinned) return
+      const under = document.elementFromPoint(clientX, clientY)
+      if (
+        under &&
+        (panel.contains(under) ||
+          under.closest('[data-slot="tooltip-content"]'))
+      ) {
+        return
+      }
+      setHovered(false)
+    })
+  }
+
+  function togglePinned() {
+    onPinnedChange(!pinned)
   }
 
   return (
     <>
       <div
-        onMouseEnter={expanded ? () => setHovered(true) : undefined}
+        onMouseEnter={openHover}
         onMouseLeave={closeHover}
         className={cn(
           "fixed top-0 left-0 z-40 hidden h-svh overflow-hidden md:block",
@@ -71,14 +93,14 @@ export function AppSidebar({
               "pointer-events-auto absolute inset-y-0 left-0 z-10",
               SIDEBAR_HOVER_TRIGGER
             )}
-            onMouseEnter={() => setHovered(true)}
+            onMouseEnter={openHover}
           />
         )}
         <div
           aria-hidden
           className={cn(
-            "pointer-events-none absolute inset-0 border-r border-white/10 bg-[#10261d] shadow-2xl shadow-black/40 transition-opacity duration-200 ease-out",
-            expanded ? "opacity-100" : "opacity-0"
+            "absolute inset-0 border-r border-white/10 bg-[#10261d] shadow-2xl shadow-black/40 transition-opacity duration-200 ease-out",
+            expanded ? "opacity-100" : "pointer-events-none opacity-0"
           )}
         />
 
@@ -88,7 +110,7 @@ export function AppSidebar({
               "flex w-10 shrink-0 justify-center p-1",
               !expanded && "pointer-events-auto"
             )}
-            onMouseEnter={!expanded ? () => setHovered(true) : undefined}
+            onMouseEnter={!expanded ? openHover : undefined}
           >
             <button
               type="button"
@@ -117,7 +139,7 @@ export function AppSidebar({
               expanded={expanded}
               onNavigate={() => {
                 onMobileOpenChange(false)
-                closeHover()
+                if (!pinned) setHovered(false)
               }}
             />
           </div>
@@ -153,6 +175,7 @@ function SidebarBody({
   const router = useRouter()
   const games = useHistory()
   const identity = useIdentity()
+  const settings = useGameSettingsApi()
 
   function hideGame(code: string) {
     if (pathname === `/${code}`) router.push("/")
@@ -170,6 +193,17 @@ function SidebarBody({
           expanded={expanded}
           onNavigate={onNavigate}
         />
+        {settings && (
+          <SidebarAction
+            icon={<Settings className="size-3" />}
+            label="Settings"
+            expanded={expanded}
+            onClick={() => {
+              settings.open()
+              onNavigate?.()
+            }}
+          />
+        )}
       </div>
 
       <div className="py-1.5">
@@ -264,6 +298,36 @@ function SidebarRow({
         </button>
       )}
     </div>
+  )
+}
+
+function SidebarAction({
+  icon,
+  label,
+  expanded,
+  onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  expanded: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={expanded ? undefined : label}
+      className={cn(
+        "flex h-8 w-full min-w-0 items-center gap-1.5 px-1.5 text-left text-[13px] leading-none",
+        ROW_HOVER,
+        FOCUS_RING
+      )}
+    >
+      <span className="flex size-5 shrink-0 items-center justify-center">
+        {icon}
+      </span>
+      {expanded && <span className="min-w-0 flex-1 truncate">{label}</span>}
+    </button>
   )
 }
 

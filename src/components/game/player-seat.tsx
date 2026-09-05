@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Bot,
   BotOff,
@@ -8,12 +8,11 @@ import {
   Crown,
   Ellipsis,
   LogOut,
-  MessageCircleHeart,
   Shuffle,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { isLegalPlay } from "@/lib/game/actions";
-import { EMOTE_LABELS, TABLE_EMOTES, type TableEmote } from "@/lib/emotes";
+import { emoteFlight, type TableEmote } from "@/lib/emotes";
 import type { Card, GameState, Seat } from "@/lib/game/types";
 import { isBridge, isOhHell } from "@/lib/game/types";
 import { isDummyRevealed } from "@/lib/game/view";
@@ -28,11 +27,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import {
   Tooltip,
@@ -40,11 +34,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EmoteIcon } from "./emote-icon";
+import { SeatChatBubble } from "./chat-bubble";
 import { DealIn } from "./deal-in";
 import { FAN_CARD, fanPose } from "./fan";
 import { PlayConfirmDock } from "./pop-confirm";
 import { originFromElement, usePlayOrigin } from "./play-origin";
 import { CardFan, PlayingCard } from "./playing-card";
+import type { ChatMessage } from "@/lib/store";
 
 export type TableSlot =
   | "south"
@@ -77,17 +73,32 @@ const SLOT_CLASS: Record<TableSlot, string> = {
     "top-[max(clamp(2.25rem,calc(2.25rem+max(0px,30rem-100vw)*0.08),3.5rem),env(safe-area-inset-top))] right-[min(22%,max(0.75rem,calc(50%-9rem)))] items-center",
 };
 
-const EMOTE_CLASS: Record<TableSlot, string> = {
-  south:
-    "-top-2 left-1/2 -translate-x-1/2 -translate-y-full [--emote-dx:0] [--emote-dy:-1]",
-  west: "top-1/2 -right-2 translate-x-full -translate-y-1/2 [--emote-dx:1] [--emote-dy:0]",
-  east: "top-1/2 -left-2 -translate-x-full -translate-y-1/2 [--emote-dx:-1] [--emote-dy:0]",
-  north:
-    "-bottom-2 left-1/2 -translate-x-1/2 translate-y-full [--emote-dx:0] [--emote-dy:1]",
-  "north-left":
-    "-bottom-2 left-1/2 -translate-x-1/2 translate-y-full [--emote-dx:0.25] [--emote-dy:1]",
-  "north-right":
-    "-bottom-2 left-1/2 -translate-x-1/2 translate-y-full [--emote-dx:-0.25] [--emote-dy:1]",
+const EMOTE_ANCHOR: Record<TableSlot, string> = {
+  south: "bottom-full left-1/2 mb-6 -translate-x-1/2",
+  west: "top-1/2 left-full ml-6 -translate-y-1/2",
+  east: "top-1/2 right-full mr-6 -translate-y-1/2",
+  north: "top-full left-1/2 mt-6 -translate-x-1/2",
+  "north-left": "top-full left-1/2 mt-6 -translate-x-1/2",
+  "north-right": "top-full left-1/2 mt-6 -translate-x-1/2",
+};
+
+/** Pin the emote to the far side of the gap so it grows away from the nameplate. */
+const EMOTE_ORIGIN: Record<TableSlot, string> = {
+  south: "bottom-0 left-0",
+  west: "top-0 left-0",
+  east: "top-0 right-0",
+  north: "top-0 left-0",
+  "north-left": "top-0 left-0",
+  "north-right": "top-0 left-0",
+};
+
+const EMOTE_DIR: Record<TableSlot, { dx: number; dy: number }> = {
+  south: { dx: 0, dy: -1 },
+  west: { dx: 1, dy: 0 },
+  east: { dx: -1, dy: 0 },
+  north: { dx: 0, dy: 1 },
+  "north-left": { dx: 0.25, dy: 1 },
+  "north-right": { dx: -0.25, dy: 1 },
 };
 
 export function PlayerSeat({
@@ -97,7 +108,8 @@ export function PlayerSeat({
   self,
   spectating,
   online,
-  emote,
+  emotes = [],
+  chatBubble,
   revealCount,
   dealing,
   dealDelays,
@@ -107,7 +119,6 @@ export function PlayerSeat({
   onRemoveBot,
   onSwapSeats,
   onLeave,
-  onEmote,
   onPlay,
   controllerSeat = null,
 }: {
@@ -117,7 +128,8 @@ export function PlayerSeat({
   self: boolean;
   spectating: boolean;
   online: boolean;
-  emote?: { id: string; emote: TableEmote };
+  emotes?: { id: string; emote: TableEmote }[];
+  chatBubble?: ChatMessage;
   revealCount?: number;
   dealing?: boolean;
   dealDelays?: number[];
@@ -127,7 +139,6 @@ export function PlayerSeat({
   onRemoveBot?: (seatIndex: number) => void;
   onSwapSeats?: (seatIndex: number) => void;
   onLeave?: () => void;
-  onEmote?: (emote: TableEmote) => void;
   onPlay?: (card: Card) => void | Promise<void | boolean>;
   controllerSeat?: number | null;
 }) {
@@ -239,20 +250,48 @@ export function PlayerSeat({
             "w-max [writing-mode:vertical-rl] [text-orientation:sideways] [&_svg]:rotate-90"
         )}
       >
-        {emote && (
+        {chatBubble && (
+          <SeatChatBubble
+            slot={slot}
+            bubbleKey={chatBubble.id}
+            body={chatBubble.body}
+          />
+        )}
+        {emotes.length > 0 && (
           <span
             className={cn(
-              "pointer-events-none absolute z-30 [writing-mode:horizontal-tb]",
-              EMOTE_CLASS[slot]
+              // Reset writing-mode + undo the sideways seat's [&_svg]:rotate-90
+              // so emotes stay upright for every player.
+              "pointer-events-none absolute z-30 [writing-mode:horizontal-tb] [&_svg]:rotate-0!",
+              EMOTE_ANCHOR[slot]
             )}
           >
-            <span
-              key={emote.id}
-              aria-hidden
-              className="seat-emote block text-[1.75rem] drop-shadow-md"
-            >
-              <EmoteIcon emote={emote.emote} />
-            </span>
+            {emotes.map((item) => {
+              const dir = EMOTE_DIR[slot];
+              const flight = emoteFlight(item.id);
+              return (
+                <span
+                  key={item.id}
+                  aria-hidden
+                  className={cn(
+                    "seat-emote absolute block text-[3.35rem] drop-shadow-[0_4px_10px_rgba(0,0,0,0.55)]",
+                    EMOTE_ORIGIN[slot]
+                  )}
+                  style={
+                    {
+                      "--emote-dx": dir.dx + flight.scatterX,
+                      "--emote-dy": dir.dy + flight.scatterY,
+                      "--emote-ox": `${flight.originX}px`,
+                      "--emote-oy": `${flight.originY}px`,
+                      "--emote-rot": `${flight.rot}deg`,
+                      "--emote-scale": flight.scale,
+                    } as CSSProperties
+                  }
+                >
+                  <EmoteIcon emote={item.emote} />
+                </span>
+              );
+            })}
           </span>
         )}
         <div
@@ -309,7 +348,6 @@ export function PlayerSeat({
               />
             )}
             <span className="inline-flex items-center">
-              {onEmote && <EmoteMenu onEmote={onEmote} />}
               {(canManageBots || (self && onLeave)) && (
                 <SeatMenu
                   seat={seat}
@@ -721,45 +759,6 @@ function SeatMenu({
         )}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-function EmoteMenu({ onEmote }: { onEmote: (emote: TableEmote) => void }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        aria-label="Emotes"
-        title="Emotes"
-        className="pointer-events-auto inline-flex size-6 shrink-0 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white"
-      >
-        <MessageCircleHeart className="size-3.5" />
-      </PopoverTrigger>
-      <PopoverContent
-        align="center"
-        side="top"
-        sideOffset={6}
-        className="w-auto rounded-2xl border-0 bg-black/25 p-1.5 text-white shadow-none ring-1 ring-white/15 backdrop-blur-sm"
-      >
-        <div className="grid grid-cols-4">
-          {TABLE_EMOTES.map((emote) => (
-            <button
-              key={emote}
-              type="button"
-              onClick={() => {
-                onEmote(emote);
-                setOpen(false);
-              }}
-              className="flex size-9 items-center justify-center rounded-full text-[1.35rem] transition-colors hover:bg-white/20 active:scale-95 md:size-8 md:text-xl"
-              aria-label={EMOTE_LABELS[emote]}
-            >
-              <EmoteIcon emote={emote} />
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
   );
 }
 

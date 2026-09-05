@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "motion/react"
 import { LoaderPinwheel } from "lucide-react"
@@ -48,17 +48,30 @@ import { actingSeatFor } from "@/lib/bridge/engine"
 import { playFromHistory, sidePoints } from "@/lib/bridge/scoring"
 import { subscribeIdentity } from "@/lib/identity"
 import { getGameStore } from "@/lib/store"
+import type { ChatMessage } from "@/lib/store"
 import { GameTable } from "./table"
 import { BidPanel } from "./overlays"
 import { BridgeBidPanel } from "@/components/bridge/bid-panel"
+import {
+  useRegisterChat,
+  type ChatSession,
+} from "@/components/game/chat-context"
+import {
+  useRegisterGameSettings,
+} from "@/components/game/settings-context"
+import { GameSettingsSheet } from "@/components/game/settings-sheet"
 
 export function GameRoom({ code }: { code: string }) {
   const router = useRouter()
-  const { record, status, error, online, emotes, sendEmote, apply, identity } = useGame(code)
+  const { record, status, error, online, emotes, messages, chatBubbles, sendEmote, sendChat, apply, identity } = useGame(code)
   const [spectating, setSpectating] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [optimisticState, setOptimisticState] = useState<GameState | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const optimisticPlay = useRef<Card | null>(null)
+
+  const openSettings = useCallback(() => setSettingsOpen(true), [])
+  useRegisterGameSettings(status === "ready" ? openSettings : null)
 
   const state = optimisticState ?? record?.state
   const stateRef = useRef(state)
@@ -69,6 +82,17 @@ export function GameRoom({ code }: { code: string }) {
     : spectating || state?.phase === "game-over"
       ? "spectator"
       : "unknown"
+
+  const chatSession = useMemo<ChatSession | null>(() => {
+    if (status !== "ready") return null
+    return {
+      messages,
+      canSend: role === "player",
+      onSend: sendChat,
+      onEmote: sendEmote,
+    }
+  }, [status, messages, role, sendChat, sendEmote])
+  useRegisterChat(chatSession)
 
   useEffect(() => {
     if (!state || !identity.id) return
@@ -350,7 +374,7 @@ export function GameRoom({ code }: { code: string }) {
             role={role}
             online={online}
             emotes={emotes}
-            onEmote={sendEmote}
+            chatBubbles={chatBubbles}
             actionError={actionError}
             onJoin={() => void onJoin()}
             onSpectate={() => setSpectating(true)}
@@ -362,6 +386,8 @@ export function GameRoom({ code }: { code: string }) {
             onContinue={() => void onContinue()}
             onRename={(title) => void onRename(title)}
             onSaveSettings={onSaveSettings}
+            settingsOpen={settingsOpen}
+            onSettingsOpenChange={setSettingsOpen}
             onMakeBot={(seatIndex) => void onMakeBot(seatIndex)}
             onRemoveBot={(seatIndex) => void onRemoveBot(seatIndex)}
             onSwapSeats={(seatIndex) => void onSwapSeats(seatIndex)}
@@ -383,7 +409,7 @@ function ReadyTable({
   role,
   online,
   emotes,
-  onEmote,
+  chatBubbles,
   actionError,
   onJoin,
   onSpectate,
@@ -395,6 +421,8 @@ function ReadyTable({
   onContinue,
   onRename,
   onSaveSettings,
+  settingsOpen,
+  onSettingsOpenChange,
   onMakeBot,
   onRemoveBot,
   onSwapSeats,
@@ -409,7 +437,7 @@ function ReadyTable({
   role: "player" | "spectator" | "unknown"
   online: string[]
   emotes: { id: string; playerId: string; emote: string }[]
-  onEmote: (emote: TableEmote) => void
+  chatBubbles: ChatMessage[]
   actionError: string | null
   onJoin: () => void
   onSpectate: () => void
@@ -421,6 +449,8 @@ function ReadyTable({
   onContinue: () => void
   onRename: (title: string) => void
   onSaveSettings: (settings: GameSettings) => void | Promise<void>
+  settingsOpen: boolean
+  onSettingsOpenChange: (open: boolean) => void
   onMakeBot: (seatIndex: number) => void
   onRemoveBot: (seatIndex: number) => void
   onSwapSeats: (seatIndex: number) => void
@@ -452,11 +482,19 @@ function ReadyTable({
     state.phase === "trick-end" &&
     !motion.trickLeaving
 
-  const emotesBySeat: Record<number, { id: string; emote: TableEmote }> = {}
+  const emotesBySeat: Record<number, { id: string; emote: TableEmote }[]> = {}
   for (const event of emotes) {
     if (!isTableEmote(event.emote)) continue
     const seat = state.seats.find((item) => item.playerId === event.playerId)
-    if (seat) emotesBySeat[seat.index] = { id: event.id, emote: event.emote }
+    if (!seat) continue
+    const list = emotesBySeat[seat.index] ?? (emotesBySeat[seat.index] = [])
+    list.push({ id: event.id, emote: event.emote })
+  }
+
+  const chatBubblesBySeat: Record<number, ChatMessage> = {}
+  for (const message of chatBubbles) {
+    const seat = state.seats.find((item) => item.playerId === message.playerId)
+    if (seat) chatBubblesBySeat[seat.index] = message
   }
 
   const roundEndRows = (() => {
@@ -514,12 +552,10 @@ function ReadyTable({
         spectating={role === "spectator"}
         onlineIds={online}
         emotesBySeat={emotesBySeat}
-        canEmote={role === "player"}
-        onEmote={onEmote}
+        chatBubblesBySeat={chatBubblesBySeat}
         motion={motion}
         onPlay={onPlay}
         onRename={onRename}
-        onSaveSettings={onSaveSettings}
         canManageBots={
           (role === "player" || role === "spectator") && state.phase === "lobby"
         }
@@ -529,6 +565,13 @@ function ReadyTable({
         onLeave={
           role === "player" && state.phase === "lobby" ? onLeave : undefined
         }
+      />
+      <GameSettingsSheet
+        open={settingsOpen}
+        onOpenChange={onSettingsOpenChange}
+        state={state}
+        editable={state.phase === "lobby"}
+        onSave={onSaveSettings}
       />
       {myTurnToBid && mySeatIndex !== null && isOhHell(state) && (
         <BidPanel state={state} seat={mySeatIndex} onBid={onBid} />

@@ -5,10 +5,11 @@ import type { TableEmote } from "@/lib/emotes";
 import { rulesLine } from "@/lib/game/rules";
 import { trickWinner } from "@/lib/game/actions";
 import { displayGameTitle } from "@/lib/game/title";
-import type { Card, GameSettings, GameState } from "@/lib/game/types";
+import type { Card, GameState } from "@/lib/game/types";
 import { isBridge, isOhHell } from "@/lib/game/types";
 import { sideForSeat } from "@/lib/bridge/types";
 import { canControlSeat, flippedTrump, trumpForTrickWinner } from "@/lib/game/view";
+import type { ChatMessage } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -21,7 +22,6 @@ import { PlayerSeat, slotFor } from "./player-seat";
 import { Scoreboard } from "./score-sheet";
 import { DealOverlay } from "./deal-overlay";
 import { PlayOriginProvider } from "./play-origin";
-import { GameSettingsSheet } from "./settings-sheet";
 import { TrickPile } from "./trick-pile";
 import { TrumpSpot } from "./trump-reveal";
 
@@ -31,12 +31,10 @@ export function GameTable({
   spectating,
   onlineIds,
   emotesBySeat,
-  canEmote,
-  onEmote,
+  chatBubblesBySeat,
   motion,
   onPlay,
   onRename,
-  onSaveSettings,
   canManageBots,
   onMakeBot,
   onRemoveBot,
@@ -47,13 +45,11 @@ export function GameTable({
   mySeat: number | null;
   spectating: boolean;
   onlineIds: string[];
-  emotesBySeat: Record<number, { id: string; emote: TableEmote }>;
-  canEmote: boolean;
-  onEmote: (emote: TableEmote) => void;
+  emotesBySeat: Record<number, { id: string; emote: TableEmote }[]>;
+  chatBubblesBySeat: Record<number, ChatMessage>;
   motion: TableMotion;
   onPlay: (card: Card) => void | Promise<void | boolean>;
   onRename: (title: string) => void;
-  onSaveSettings: (settings: GameSettings) => void | Promise<void>;
   canManageBots?: boolean;
   onMakeBot?: (seatIndex: number) => void;
   onRemoveBot?: (seatIndex: number) => void;
@@ -86,7 +82,7 @@ export function GameTable({
           waiting && "cursor-pointer"
         )}
       >
-        <header className="pointer-events-none absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.5rem,env(safe-area-inset-right))] left-[max(3.25rem,env(safe-area-inset-left))] z-20 flex items-start justify-between gap-4 text-white/80 md:left-0 md:pl-[var(--header-left-pad,0.75rem)]">
+        <header className="pointer-events-none absolute top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.5rem,env(safe-area-inset-right))] left-[max(3.25rem,env(safe-area-inset-left))] z-20 flex items-start justify-between gap-4 text-white/80 md:left-0 md:pr-[var(--header-right-pad,2.75rem)] md:pl-[var(--header-left-pad,0.75rem)]">
           <div className="hidden min-w-0 md:block">
             <TitleEditor
               title={displayGameTitle(state.title)}
@@ -96,11 +92,6 @@ export function GameTable({
               {rulesLine(state.settings)}
             </p>
           </div>
-          <GameSettingsSheet
-            state={state}
-            editable={state.phase === "lobby"}
-            onSave={onSaveSettings}
-          />
         </header>
 
         {trumpCard && (
@@ -144,7 +135,8 @@ export function GameTable({
               self={self}
               spectating={spectating}
               online={seat.playerId ? onlineIds.includes(seat.playerId) : false}
-              emote={emotesBySeat[seat.index]}
+              emotes={emotesBySeat[seat.index]}
+              chatBubble={chatBubblesBySeat[seat.index]}
               revealCount={
                 motion.dealing || motion.enteringDeal
                   ? motion.dealing
@@ -164,7 +156,6 @@ export function GameTable({
               onRemoveBot={onRemoveBot}
               onSwapSeats={onSwapSeats}
               onLeave={self ? onLeave : undefined}
-              onEmote={self && canEmote ? onEmote : undefined}
               controllerSeat={mySeat}
               onPlay={
                 state.phase === "playing" &&
