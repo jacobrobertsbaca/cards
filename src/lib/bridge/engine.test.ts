@@ -41,6 +41,31 @@ describe("bridge engine", () => {
     assert.equal(state.contract.strain, "notrump")
   })
 
+  it("redeals and bumps dealIndex after four opening passes", () => {
+    let state = createBridgeGame()
+    for (let seat = 0; seat < 4; seat++) state = makeBridgeBot(state, seat)
+    state = startBridgeGame(state)
+
+    const dealer = state.dealer
+    const dealIndex = state.dealIndex
+    const firstHand = state.hands[0].map((card) => `${card.rank}${card.suit}`).join(",")
+
+    for (let i = 0; i < 4; i++) {
+      const seat = state.currentSeat!
+      state = placeBridgeCall(state, seat, { type: "pass" })
+    }
+
+    assert.equal(state.phase, "bidding")
+    assert.equal(state.auction.length, 0)
+    assert.equal(state.dealIndex, dealIndex + 1)
+    assert.equal(state.dealer, (dealer + 1) % 4)
+    assert.equal(state.hands[0].length, 13)
+    assert.notEqual(
+      state.hands[0].map((card) => `${card.rank}${card.suit}`).join(","),
+      firstHand
+    )
+  })
+
   it("lists legal calls including pass", () => {
     let state = createBridgeGame()
     state = joinBridgeGame(state, "a", "A")

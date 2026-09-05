@@ -347,8 +347,10 @@ export function placeBridgeCall(
   }
 
   if (done === "passout") {
-    // Redeal: rotate dealer, no score
+    // Redeal: rotate dealer, no score. Bump dealIndex so the table re-runs
+    // the deal-out animation (motion keys off dealIndex, not just phase).
     next.dealer = nextSeat(next.dealer)
+    next.dealIndex += 1
     return startBridgeDeal(next)
   }
 

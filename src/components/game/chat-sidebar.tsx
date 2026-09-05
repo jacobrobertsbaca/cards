@@ -103,7 +103,7 @@ export function ChatSidebar({
           )}
         />
 
-        <div className="relative flex h-full w-full flex-col text-white">
+        <div className="relative z-10 flex h-full w-full flex-col text-white">
           <div
             className={cn(
               "ml-auto flex w-10 shrink-0 justify-center p-1",
@@ -205,15 +205,32 @@ function ChatBody({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  function scrollListToBottom() {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function onListScroll() {
+    const el = listRef.current;
+    if (!el) return;
+    stickToBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  }
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (!stickToBottomRef.current) return;
+    scrollListToBottom();
   }, [messages.length]);
 
   useEffect(() => {
     if (!focusInput) return;
+    stickToBottomRef.current = true;
+    scrollListToBottom();
     setNow(Date.now());
     const tick = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(tick);
@@ -250,6 +267,7 @@ function ChatBody({
     const body = draft.trim();
     if (!canSend || !body || busy) return;
     setBusy(true);
+    stickToBottomRef.current = true;
     try {
       await onSend(body);
       setDraft("");
@@ -260,7 +278,11 @@ function ChatBody({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 scrollbar-none [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={listRef}
+        onScroll={onListScroll}
+        className="min-h-0 flex-1 overflow-y-auto px-2 scrollbar-none [&::-webkit-scrollbar]:hidden"
+      >
         <div className="flex flex-col gap-2.5 px-1 py-2 pb-3">
           {messages.length === 0 && (
             <p className="px-1 py-6 text-center text-[12px] text-white/35">
@@ -305,7 +327,6 @@ function ChatBody({
               </div>
             );
           })}
-          <div ref={bottomRef} />
         </div>
       </div>
 

@@ -1,22 +1,11 @@
 "use client"
 
 import { useEffect } from "react"
+import { shouldRunBotController } from "@/lib/oh-hell/bots"
 import {
-  chooseBid,
-  choosePlay,
-  isBotSeat,
-  shouldRunBotController,
-} from "@/lib/oh-hell/bots"
-import {
-  chooseBridgeCall,
-  chooseBridgePlay,
-  isBridgeBotSeat,
-} from "@/lib/bridge/bots"
-import {
-  placeBid,
-  placeCall,
-  playCard,
-} from "@/lib/game/actions"
+  applyScheduledBotTurn,
+  isBotTurn,
+} from "@/lib/game/bot-turn"
 import type { BridgeCall } from "@/lib/bridge/types"
 import type { GameState, Seat } from "@/lib/game/types"
 import { isBridge, isOhHell } from "@/lib/game/types"
@@ -40,91 +29,48 @@ export function useBotController(
 
   useEffect(() => {
     if (!state || version === undefined) return
-
-    if (isBridge(state)) {
-      if (
-        !shouldRunBotController(state, mySeatIndex, { playerId, onlineIds })
-      ) {
-        return
-      }
-      const seat = state.currentSeat
-      if (seat === null) return
-
-      // Declarer (not dummy) plays from dummy after the opening lead.
-      const actor =
-        state.phase === "playing" &&
-        state.contract &&
-        state.openingLeadDone &&
-        seat === state.contract.dummy
-          ? state.contract.declarer
-          : seat
-
-      if (!isBridgeBotSeat(state.seats[actor])) return
-
-      const timer = window.setTimeout(() => {
-        void (async () => {
-          try {
-            if (state.phase === "bidding") {
-              const auction = state.auction
-              const call = chooseBridgeCall(state, actor)
-              await apply((current) => {
-                if (!isBridge(current)) return current
-                return placeCall(current, actor, call)
-              })
-              const botSeat = state.seats[actor]
-              if (botSeat) onBridgeCall?.(botSeat, call, auction)
-              return
-            }
-            if (state.phase === "playing") {
-              await apply((current) => {
-                if (!isBridge(current)) return current
-                return playCard(
-                  current,
-                  actor,
-                  chooseBridgePlay(current, actor)
-                )
-              })
-            }
-          } catch {
-            // Ignore races
-          }
-        })()
-      }, 700)
-      return () => window.clearTimeout(timer)
-    }
-
-    if (!isOhHell(state)) return
+    if (!isBridge(state) && !isOhHell(state)) return
     if (
       !shouldRunBotController(state, mySeatIndex, { playerId, onlineIds })
     ) {
       return
     }
 
-    const seat = state.currentSeat
-    if (seat === null) return
-    if (!isBotSeat(state.seats[seat])) return
+    const expectedSeat = state.currentSeat
+    if (expectedSeat === null) return
+    if (!isBotTurn(state)) return
 
     const timer = window.setTimeout(() => {
       void (async () => {
+        const placed: {
+          bridgeCall: {
+            seat: Seat
+            call: BridgeCall
+            auction: BridgeCall[]
+          } | null
+          ohHellBid: { seat: Seat; bid: number } | null
+        } = { bridgeCall: null, ohHellBid: null }
         try {
-          if (state.phase === "bidding") {
-            const bid = chooseBid(state, seat)
-            await apply((current) => {
-              if (!isOhHell(current)) return current
-              return placeBid(current, seat, bid)
-            })
-            const botSeat = state.seats[seat]
-            if (botSeat) onOhHellBid?.(botSeat, bid)
-            return
+          await apply((current) => {
+            placed.bridgeCall = null
+            placed.ohHellBid = null
+            const result = applyScheduledBotTurn(current, expectedSeat)
+            if (result.bridgeCall) placed.bridgeCall = result.bridgeCall
+            if (result.ohHellBid) placed.ohHellBid = result.ohHellBid
+            return result.state
+          })
+          if (placed.bridgeCall) {
+            onBridgeCall?.(
+              placed.bridgeCall.seat,
+              placed.bridgeCall.call,
+              placed.bridgeCall.auction
+            )
           }
-          if (state.phase === "playing") {
-            await apply((current) => {
-              if (!isOhHell(current)) return current
-              return playCard(current, seat, choosePlay(current, seat))
-            })
+          if (placed.ohHellBid) {
+            onOhHellBid?.(placed.ohHellBid.seat, placed.ohHellBid.bid)
           }
         } catch {
-          // Ignore races when multiple clients apply the same bot move.
+          // Ignore races when another client already advanced the turn.
         }
       })()
     }, 700)

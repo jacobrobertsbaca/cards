@@ -10,11 +10,12 @@ const BUBBLE_ANCHOR: Record<TableSlot, string> = {
   south: "-top-5 left-1/2 -translate-x-1/2 -translate-y-full items-center",
   west: "top-1/2 -right-5 translate-x-full -translate-y-1/2 items-start",
   east: "top-1/2 -left-5 -translate-x-full -translate-y-1/2 items-end",
-  north: "-bottom-5 left-1/2 -translate-x-1/2 translate-y-full items-center",
+  // North nameplates sit above the hand — keep bubbles on the outer side.
+  north: "-top-5 left-1/2 -translate-x-1/2 -translate-y-full items-center",
   "north-left":
-    "-bottom-5 left-1/2 -translate-x-1/2 translate-y-full items-start",
+    "-top-5 left-1/2 -translate-x-1/2 -translate-y-full items-start",
   "north-right":
-    "-bottom-5 left-1/2 -translate-x-1/2 translate-y-full items-end",
+    "-top-5 left-1/2 -translate-x-1/2 -translate-y-full items-end",
 }
 
 /** Tail points back toward the nameplate. */
@@ -44,22 +45,22 @@ const ARROW: Record<
     h: 16,
   },
   north: {
-    className: "bottom-full left-1/2 -mb-px -translate-x-1/2",
-    path: "M0 10 L8 0 L16 10 Z",
+    className: "left-1/2 top-full -mt-px -translate-x-1/2",
+    path: "M0 0 L8 10 L16 0 Z",
     viewBox: "0 0 16 10",
     w: 16,
     h: 10,
   },
   "north-left": {
-    className: "bottom-full left-4 -mb-px",
-    path: "M0 10 L8 0 L16 10 Z",
+    className: "left-4 top-full -mt-px",
+    path: "M0 0 L8 10 L16 0 Z",
     viewBox: "0 0 16 10",
     w: 16,
     h: 10,
   },
   "north-right": {
-    className: "right-4 bottom-full -mb-px",
-    path: "M0 10 L8 0 L16 10 Z",
+    className: "right-4 top-full -mt-px",
+    path: "M0 0 L8 10 L16 0 Z",
     viewBox: "0 0 16 10",
     w: 16,
     h: 10,
@@ -71,18 +72,18 @@ const FROM_SEAT: Record<TableSlot, { x: number; y: number }> = {
   south: { x: 0, y: 10 },
   west: { x: -12, y: 0 },
   east: { x: 12, y: 0 },
-  north: { x: 0, y: -10 },
-  "north-left": { x: -4, y: -10 },
-  "north-right": { x: 4, y: -10 },
+  north: { x: 0, y: 10 },
+  "north-left": { x: -4, y: 10 },
+  "north-right": { x: 4, y: 10 },
 }
 
 const DRIFT: Record<TableSlot, { x: number; y: number }> = {
   south: { x: 0, y: -8 },
   west: { x: 8, y: -3 },
   east: { x: -8, y: -3 },
-  north: { x: 0, y: 6 },
-  "north-left": { x: 3, y: 6 },
-  "north-right": { x: -3, y: 6 },
+  north: { x: 0, y: -8 },
+  "north-left": { x: 3, y: -8 },
+  "north-right": { x: -3, y: -8 },
 }
 
 const DURATION_S = CHAT_BUBBLE_DURATION_MS / 1000

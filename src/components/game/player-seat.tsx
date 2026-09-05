@@ -77,9 +77,10 @@ const EMOTE_ANCHOR: Record<TableSlot, string> = {
   south: "bottom-full left-1/2 mb-6 -translate-x-1/2",
   west: "top-1/2 left-full ml-6 -translate-y-1/2",
   east: "top-1/2 right-full mr-6 -translate-y-1/2",
-  north: "top-full left-1/2 mt-6 -translate-x-1/2",
-  "north-left": "top-full left-1/2 mt-6 -translate-x-1/2",
-  "north-right": "top-full left-1/2 mt-6 -translate-x-1/2",
+  // Name sits above north hands — grow emotes away from the cards (up).
+  north: "bottom-full left-1/2 mb-6 -translate-x-1/2",
+  "north-left": "bottom-full left-1/2 mb-6 -translate-x-1/2",
+  "north-right": "bottom-full left-1/2 mb-6 -translate-x-1/2",
 };
 
 /** Pin the emote to the far side of the gap so it grows away from the nameplate. */
@@ -87,18 +88,18 @@ const EMOTE_ORIGIN: Record<TableSlot, string> = {
   south: "bottom-0 left-0",
   west: "top-0 left-0",
   east: "top-0 right-0",
-  north: "top-0 left-0",
-  "north-left": "top-0 left-0",
-  "north-right": "top-0 left-0",
+  north: "bottom-0 left-0",
+  "north-left": "bottom-0 left-0",
+  "north-right": "bottom-0 left-0",
 };
 
 const EMOTE_DIR: Record<TableSlot, { dx: number; dy: number }> = {
   south: { dx: 0, dy: -1 },
   west: { dx: 1, dy: 0 },
   east: { dx: -1, dy: 0 },
-  north: { dx: 0, dy: 1 },
-  "north-left": { dx: 0.25, dy: 1 },
-  "north-right": { dx: -0.25, dy: 1 },
+  north: { dx: 0, dy: -1 },
+  "north-left": { dx: 0.25, dy: -1 },
+  "north-right": { dx: -0.25, dy: -1 },
 };
 
 export function PlayerSeat({
@@ -172,37 +173,6 @@ export function PlayerSeat({
         SLOT_CLASS[slot]
       )}
     >
-      {slot.startsWith("north") && (
-        <div
-          className={cn(
-            "max-w-[min(96vw,42rem)]",
-            dummyUp ? "mb-2" : "mb-2 md:mb-3"
-          )}
-        >
-          {dummyUp ? (
-            <OwnHand
-              hand={hand}
-              state={state}
-              seat={seat.index}
-              controllerSeat={controllerSeat ?? seat.index}
-              dealing={dealing}
-              dealDelays={dealDelays}
-              onPlay={onPlay}
-              confirmPlacement="north"
-            />
-          ) : (
-            <CardFan
-              count={hand.length}
-              cards={showFaces ? hand : undefined}
-              faceDown={!showFaces}
-              size="sm"
-              dealing={dealing}
-              dealDelays={dealDelays}
-              className="origin-bottom md:scale-[1.22]"
-            />
-          )}
-        </div>
-      )}
       {slot === "east" && (
         <SideHand slot="east" roomy={dummyUp}>
           {dummyUp ? (
@@ -233,14 +203,19 @@ export function PlayerSeat({
 
       <div
         className={cn(
-          "relative",
+          // Keep names painted above card fans when they overlap.
+          "relative z-20",
           slot === "south"
             ? dummyUp
               ? "mt-1 mb-2.5"
               : "mt-1 mb-7 md:mb-6"
-            : dummyUp
-              ? "my-1.5"
-              : "my-1",
+            : slot.startsWith("north")
+              ? dummyUp
+                ? "mb-3 md:mb-6"
+                : "mb-5 md:mb-10"
+              : dummyUp
+                ? "my-1.5"
+                : "my-1",
           // Keep writing-mode on the sizing box for side seats. Without it,
           // WebKit (iOS) sizes this wrapper like horizontal text and the
           // vertical name hugs the right edge — clipping east seats.
@@ -376,6 +351,33 @@ export function PlayerSeat({
           </span>
         </div>
       </div>
+
+      {slot.startsWith("north") && (
+        <div className="max-w-[min(96vw,42rem)]">
+          {dummyUp ? (
+            <OwnHand
+              hand={hand}
+              state={state}
+              seat={seat.index}
+              controllerSeat={controllerSeat ?? seat.index}
+              dealing={dealing}
+              dealDelays={dealDelays}
+              onPlay={onPlay}
+              confirmPlacement="north"
+            />
+          ) : (
+            <CardFan
+              count={hand.length}
+              cards={showFaces ? hand : undefined}
+              faceDown={!showFaces}
+              size="sm"
+              dealing={dealing}
+              dealDelays={dealDelays}
+              className="origin-bottom md:scale-[1.22]"
+            />
+          )}
+        </div>
+      )}
 
       {slot === "west" && (
         <SideHand slot="west" roomy={dummyUp}>
