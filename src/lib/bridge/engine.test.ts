@@ -23,10 +23,11 @@ describe("bridge engine", () => {
     state = startBridgeGame(state)
     assert.equal(state.phase, "bidding")
     assert.equal(state.hands[0].length, 13)
+    assert.equal(state.currentSeat, state.dealer)
 
-    // Dealer+1 opens 1NT, then three passes
-    const first = state.currentSeat!
-    state = placeBridgeCall(state, first, {
+    // Dealer opens 1NT, then three passes
+    const dealer = state.dealer
+    state = placeBridgeCall(state, dealer, {
       type: "bid",
       level: 1,
       strain: "notrump",
@@ -39,6 +40,7 @@ describe("bridge engine", () => {
     assert.ok(state.contract)
     assert.equal(state.contract.level, 1)
     assert.equal(state.contract.strain, "notrump")
+    assert.equal(state.contract.declarer, dealer)
   })
 
   it("redeals and bumps dealIndex after four opening passes", () => {
@@ -59,6 +61,7 @@ describe("bridge engine", () => {
     assert.equal(state.auction.length, 0)
     assert.equal(state.dealIndex, dealIndex + 1)
     assert.equal(state.dealer, (dealer + 1) % 4)
+    assert.equal(state.currentSeat, state.dealer)
     assert.equal(state.hands[0].length, 13)
     assert.notEqual(
       state.hands[0].map((card) => `${card.rank}${card.suit}`).join(","),

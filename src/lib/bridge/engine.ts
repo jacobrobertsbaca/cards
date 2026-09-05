@@ -6,6 +6,7 @@ import {
   BRIDGE_SEAT_COUNT,
   DEFAULT_BRIDGE_SETTINGS,
   compareBids,
+  auctionSeat,
   partnerSeat,
   sideForSeat,
   type BridgeCall,
@@ -230,8 +231,7 @@ function doublesLevel(auction: BridgeCall[]): 0 | 1 | 2 {
 function lastBidderSeat(state: BridgeState): number | null {
   const idx = lastBidIndex(state.auction)
   if (idx < 0) return null
-  const first = nextSeat(state.dealer)
-  return (first + idx) % BRIDGE_SEAT_COUNT
+  return auctionSeat(state.dealer, idx)
 }
 
 export function legalBridgeCalls(state: BridgeState, seat: number): BridgeCall[] {
@@ -295,8 +295,7 @@ function resolveContract(state: BridgeState): BridgeContract | null {
   const bid = lastBid(state.auction)
   if (!bid) return null
   const bidIdx = lastBidIndex(state.auction)
-  const first = nextSeat(state.dealer)
-  const bidderSeat = (first + bidIdx) % BRIDGE_SEAT_COUNT
+  const bidderSeat = auctionSeat(state.dealer, bidIdx)
 
   // Declarer is the first player on the winning side who bid the strain
   const winningSide = sideForSeat(bidderSeat)
@@ -304,7 +303,7 @@ function resolveContract(state: BridgeState): BridgeContract | null {
   for (let i = 0; i <= bidIdx; i++) {
     const call = state.auction[i]
     if (call.type !== "bid" || call.strain !== bid.strain) continue
-    const seat = (first + i) % BRIDGE_SEAT_COUNT
+    const seat = auctionSeat(state.dealer, i)
     if (sideForSeat(seat) === winningSide) {
       declarer = seat
       break
@@ -520,8 +519,8 @@ export function startBridgeDeal(state: BridgeState): BridgeState {
   next.tricks = [0, 0, 0, 0]
   next.currentTrick = []
   next.lastTrick = []
-  next.trickLeader = nextSeat(next.dealer)
-  next.currentSeat = next.trickLeader
+  next.trickLeader = next.dealer
+  next.currentSeat = next.dealer
   next.phase = "bidding"
   return next
 }

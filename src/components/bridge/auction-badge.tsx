@@ -1,10 +1,10 @@
 "use client";
 
-import type {
-  BridgeCall,
-  BridgeState,
+import {
+  auctionSeat,
+  type BridgeCall,
+  type BridgeState,
 } from "@/lib/bridge/types";
-import { BRIDGE_SEAT_COUNT } from "@/lib/bridge/types";
 import { CallLabel, CallLabelInk, contractMarkup } from "./call-label";
 import { cn } from "@/lib/utils";
 import {
@@ -12,10 +12,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-function auctionSeat(dealer: number, callIndex: number) {
-  return (dealer + 1 + callIndex) % BRIDGE_SEAT_COUNT;
-}
 
 export function callsForSeat(
   state: BridgeState,

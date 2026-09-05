@@ -81,6 +81,11 @@ export function partnerSeat(seat: number): number {
   return (seat + 2) % BRIDGE_SEAT_COUNT
 }
 
+/** Seat that made the call at `callIndex`. Bridge auctions start with the dealer. */
+export function auctionSeat(dealer: number, callIndex: number): number {
+  return (dealer + callIndex) % BRIDGE_SEAT_COUNT
+}
+
 export function strainRank(strain: BridgeStrain): number {
   return STRAIN_ORDER.indexOf(strain)
 }
