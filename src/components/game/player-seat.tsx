@@ -161,7 +161,7 @@ export function PlayerSeat({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute z-10 flex",
+        "pointer-events-none absolute flex",
         sideways
           ? cn(
               "flex-row items-center",
@@ -203,8 +203,9 @@ export function PlayerSeat({
 
       <div
         className={cn(
-          // Keep names painted above card fans when they overlap.
-          "relative z-20",
+          // Keep names and emotes above the trick pile. No z-index on the seat
+          // itself — that would trap this layer under the pile.
+          "relative z-30",
           slot === "south"
             ? dummyUp
               ? "mt-1 mb-2.5"

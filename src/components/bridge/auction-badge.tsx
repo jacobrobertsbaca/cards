@@ -30,6 +30,9 @@ export function lastCallForSeat(
   return calls[calls.length - 1] ?? null;
 }
 
+const WINNING_CALL =
+  "font-bold text-amber-300 [text-shadow:0_0_10px_rgb(251_191_36/0.85),0_0_2px_rgb(251_191_36/0.9)]";
+
 /** Highest bid currently on the table (ignores pass/X/XX). */
 export function winningBid(state: BridgeState): {
   call: Extract<BridgeCall, { type: "bid" }>;
@@ -71,9 +74,7 @@ export function BridgeAuctionBadge({
         delay={200}
         className={cn(
           "pointer-events-auto text-[11px] leading-none md:text-xs",
-          isWinner
-            ? "font-bold text-amber-300 [text-shadow:0_0_10px_rgb(251_191_36/0.85),0_0_2px_rgb(251_191_36/0.9)]"
-            : "font-semibold text-white/80"
+          isWinner ? WINNING_CALL : "font-semibold text-white/80"
         )}
       >
         <CallLabel call={last} />
@@ -122,7 +123,9 @@ export function BridgePlayBadge({
           className="pointer-events-auto text-[11px] leading-none font-semibold tabular-nums text-white/80 md:text-xs"
         >
           <span className="inline-flex items-baseline gap-1">
-            {contractMarkup(contract.level, contract.strain, contract.doubles)}
+            <span className={WINNING_CALL}>
+              {contractMarkup(contract.level, contract.strain, contract.doubles)}
+            </span>
             <span className="text-white/30">/</span>
             <span>{tricks}</span>
           </span>
