@@ -6,6 +6,7 @@ import { trickWinner } from "@/lib/game/actions"
 import type { GameState, TrickPlay } from "@/lib/game/types"
 import { isBridge, isOhHell } from "@/lib/game/types"
 import {
+  canControlSeat,
   cardsDealtThisRound,
   dealIndexOf,
   flippedTrump,
@@ -153,7 +154,8 @@ export function useTableMotion(state: GameState, mySeat: number | null) {
 
     if (state.currentTrick.length > before.currentTrick.length) {
       const play = state.currentTrick[state.currentTrick.length - 1]
-      if (play && play.seat !== mySeat) playDeal()
+      // Declarer playing dummy is a local play — the trick seat is dummy's.
+      if (play && !canControlSeat(state, mySeat, play.seat)) playDeal()
     }
   }, [mySeat, state])
 

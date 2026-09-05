@@ -70,7 +70,7 @@ export function GameRoom({ code }: { code: string }) {
   const [actionError, setActionError] = useState<string | null>(null)
   const [optimisticState, setOptimisticState] = useState<GameState | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const optimisticPlay = useRef<Card | null>(null)
+  const optimisticPlay = useRef<{ card: Card; fromSeat: number } | null>(null)
 
   const openSettings = useCallback(() => setSettingsOpen(true), [])
   useRegisterGameSettings(status === "ready" ? openSettings : null)
@@ -120,10 +120,12 @@ export function GameRoom({ code }: { code: string }) {
   }, [apply, identity.id, mySeat])
 
   useEffect(() => {
-    const card = optimisticPlay.current
-    if (!card || mySeat == null || !record?.state) return
-    const stillInHand = record.state.hands[mySeat.index]?.some((item) =>
-      sameCard(item, card)
+    const pending = optimisticPlay.current
+    if (!pending || mySeat == null || !record?.state) return
+    // Dummy plays leave the dummy hand, not the declarer's — check the seat
+    // the card actually came from or the optimistic trick snaps back.
+    const stillInHand = record.state.hands[pending.fromSeat]?.some((item) =>
+      sameCard(item, pending.card)
     )
     if (!stillInHand) {
       optimisticPlay.current = null
@@ -187,7 +189,7 @@ export function GameRoom({ code }: { code: string }) {
         ? (actingSeatFor(current, mySeat.index) ?? mySeat.index)
         : mySeat.index
 
-    optimisticPlay.current = card
+    optimisticPlay.current = { card, fromSeat }
     setOptimisticState(playCard(current, mySeat.index, card))
     playDeal()
     setActionError(null)
