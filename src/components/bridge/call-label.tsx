@@ -98,6 +98,31 @@ export function formatCallPlain(call: BridgeCall): string {
   return `${call.level}${strain}`
 }
 
+function lastBidInAuction(
+  auction: BridgeCall[]
+): Extract<BridgeCall, { type: "bid" }> | null {
+  for (let i = auction.length - 1; i >= 0; i--) {
+    const call = auction[i]
+    if (call?.type === "bid") return call
+  }
+  return null
+}
+
+/** Chat-line copy for a bridge call, e.g. "Bid 3NT" / "Doubled 3♥". */
+export function formatBidChat(
+  call: BridgeCall,
+  auctionBeforeCall: BridgeCall[]
+): string {
+  if (call.type === "pass") return "Passed"
+  if (call.type === "bid") return `Bid ${formatCallPlain(call)}`
+  const target = lastBidInAuction(auctionBeforeCall)
+  const contract = target ? formatCallPlain(target) : ""
+  if (call.type === "double") {
+    return contract ? `Doubled ${contract}` : "Doubled"
+  }
+  return contract ? `Redoubled ${contract}` : "Redoubled"
+}
+
 export function contractMarkup(
   level: number,
   strain: BridgeStrain,

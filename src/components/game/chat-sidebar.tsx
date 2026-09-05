@@ -272,10 +272,16 @@ function ChatBody({
           {messages.map((message) => {
             const ago = chatTimeAgo(message.createdAt, now);
             const exact = chatExactTime(message.createdAt);
+            const isState = message.kind === "state";
             return (
               <div key={message.id} className="min-w-0">
                 <div className="flex min-w-0 items-baseline gap-1.5 text-[11px] leading-none">
-                  <p className="min-w-0 flex-1 truncate font-medium text-white/45">
+                  <p
+                    className={cn(
+                      "min-w-0 flex-1 truncate font-medium",
+                      isState ? "text-white/30" : "text-white/45"
+                    )}
+                  >
                     {message.playerName || "Player"}
                   </p>
                   {ago && (
@@ -288,7 +294,12 @@ function ChatBody({
                     </time>
                   )}
                 </div>
-                <p className="wrap-break-word mt-1 text-[13px] leading-snug text-white/90">
+                <p
+                  className={cn(
+                    "wrap-break-word mt-1 text-[13px] leading-snug",
+                    isState ? "text-white/40" : "text-white/90"
+                  )}
+                >
                   {message.body}
                 </p>
               </div>

@@ -17,7 +17,8 @@ import {
   placeCall,
   playCard,
 } from "@/lib/game/actions"
-import type { GameState } from "@/lib/game/types"
+import type { BridgeCall } from "@/lib/bridge/types"
+import type { GameState, Seat } from "@/lib/game/types"
 import { isBridge, isOhHell } from "@/lib/game/types"
 
 export function useBotController(
@@ -25,10 +26,17 @@ export function useBotController(
   version: number | undefined,
   mySeatIndex: number | null,
   apply: (mutate: (current: GameState) => GameState) => Promise<unknown>,
-  opts?: { playerId?: string; onlineIds?: string[] }
+  opts?: {
+    playerId?: string
+    onlineIds?: string[]
+    onBridgeCall?: (seat: Seat, call: BridgeCall, auction: BridgeCall[]) => void
+    onOhHellBid?: (seat: Seat, bid: number) => void
+  }
 ) {
   const playerId = opts?.playerId
   const onlineIds = opts?.onlineIds
+  const onBridgeCall = opts?.onBridgeCall
+  const onOhHellBid = opts?.onOhHellBid
 
   useEffect(() => {
     if (!state || version === undefined) return
@@ -57,10 +65,14 @@ export function useBotController(
         void (async () => {
           try {
             if (state.phase === "bidding") {
+              const auction = state.auction
+              const call = chooseBridgeCall(state, actor)
               await apply((current) => {
                 if (!isBridge(current)) return current
-                return placeCall(current, actor, chooseBridgeCall(current, actor))
+                return placeCall(current, actor, call)
               })
+              const botSeat = state.seats[actor]
+              if (botSeat) onBridgeCall?.(botSeat, call, auction)
               return
             }
             if (state.phase === "playing") {
@@ -96,10 +108,13 @@ export function useBotController(
       void (async () => {
         try {
           if (state.phase === "bidding") {
+            const bid = chooseBid(state, seat)
             await apply((current) => {
               if (!isOhHell(current)) return current
-              return placeBid(current, seat, chooseBid(current, seat))
+              return placeBid(current, seat, bid)
             })
+            const botSeat = state.seats[seat]
+            if (botSeat) onOhHellBid?.(botSeat, bid)
             return
           }
           if (state.phase === "playing") {
@@ -118,6 +133,8 @@ export function useBotController(
   }, [
     apply,
     mySeatIndex,
+    onBridgeCall,
+    onOhHellBid,
     onlineIds,
     playerId,
     state?.currentSeat,

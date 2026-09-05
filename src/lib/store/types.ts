@@ -28,6 +28,7 @@ export type ChatMessage = {
   playerId: string
   playerName: string
   body: string
+  kind: "chat" | "state"
   createdAt: string
 }
 
@@ -48,6 +49,7 @@ export type ChatDraft = {
   playerId: string
   playerName: string
   body: string
+  kind?: "chat" | "state"
 }
 
 export interface GameStore {

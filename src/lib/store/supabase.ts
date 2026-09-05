@@ -22,6 +22,7 @@ type MessageRow = {
   player_id: string
   player_name: string
   body: string
+  kind: "chat" | "state" | null
   created_at: string
 }
 
@@ -41,6 +42,7 @@ function toMessage(row: MessageRow): ChatMessage {
     playerId: row.player_id,
     playerName: row.player_name,
     body: row.body,
+    kind: row.kind === "state" ? "state" : "chat",
     createdAt: row.created_at,
   }
 }
@@ -85,7 +87,7 @@ export function createSupabaseStore(client: SupabaseClient): GameStore {
     async listMessages(code) {
       const { data, error } = await client
         .from("game_messages")
-        .select("id, game_code, player_id, player_name, body, created_at")
+        .select("id, game_code, player_id, player_name, body, kind, created_at")
         .eq("game_code", code)
         .order("created_at", { ascending: true })
         .limit(200)
@@ -101,8 +103,9 @@ export function createSupabaseStore(client: SupabaseClient): GameStore {
           player_id: draft.playerId,
           player_name: draft.playerName,
           body: draft.body,
+          kind: draft.kind ?? "chat",
         })
-        .select("id, game_code, player_id, player_name, body, created_at")
+        .select("id, game_code, player_id, player_name, body, kind, created_at")
         .single()
       if (error) throw error
       return toMessage(data as MessageRow)

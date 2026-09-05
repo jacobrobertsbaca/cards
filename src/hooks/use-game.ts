@@ -211,14 +211,24 @@ export function useGame(code: string) {
   )
 
   const sendChat = useCallback(
-    async (raw: string) => {
+    async (
+      raw: string,
+      opts?: {
+        kind?: "chat" | "state"
+        playerId?: string
+        playerName?: string
+      }
+    ) => {
       const body = normalizeChatBody(raw)
-      if (!identity.id || !body) return
+      const playerId = opts?.playerId ?? identity.id
+      if (!playerId || !body) return
+      const kind = opts?.kind ?? "chat"
       const draft = {
         id: crypto.randomUUID(),
-        playerId: identity.id,
-        playerName: identity.name || "Player",
+        playerId,
+        playerName: opts?.playerName ?? (identity.name || "Player"),
         body,
+        kind,
       }
       const optimistic: ChatMessage = {
         ...draft,

@@ -43,7 +43,9 @@ import { sameCard } from "@/lib/game/cards"
 import { isTableEmote, type TableEmote } from "@/lib/emotes"
 import type { Card, GameSettings, GameState } from "@/lib/game/types"
 import { isBridge, isOhHell } from "@/lib/game/types"
+import { formatBidChat } from "@/components/bridge/call-label"
 import type { BridgeCall } from "@/lib/bridge/types"
+import { sideForSeat } from "@/lib/bridge/types"
 import { actingSeatFor } from "@/lib/bridge/engine"
 import { playFromHistory, sidePoints } from "@/lib/bridge/scoring"
 import { subscribeIdentity } from "@/lib/identity"
@@ -145,6 +147,11 @@ export function GameRoom({ code }: { code: string }) {
     try {
       await apply((current) => placeBid(current, mySeat.index, bid))
       playDeal()
+      void sendChat(`Bid ${bid}`, {
+        kind: "state",
+        playerId: mySeat.playerId ?? identity.id,
+        playerName: mySeat.displayName ?? identity.name ?? "Player",
+      })
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not bid")
       throw err
@@ -153,10 +160,16 @@ export function GameRoom({ code }: { code: string }) {
 
   async function onCall(call: BridgeCall) {
     unlockAudio()
-    if (mySeat == null) return
+    if (mySeat == null || !state || !isBridge(state)) return
+    const auction = state.auction
     try {
       await apply((current) => placeCall(current, mySeat.index, call))
       playDeal()
+      void sendChat(formatBidChat(call, auction), {
+        kind: "state",
+        playerId: mySeat.playerId ?? identity.id,
+        playerName: mySeat.displayName ?? identity.name ?? "Player",
+      })
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not bid")
       throw err
@@ -394,6 +407,7 @@ export function GameRoom({ code }: { code: string }) {
             onLeave={() => void onLeave()}
             onRematch={() => void onRematch()}
             apply={apply}
+            sendChat={sendChat}
           />
         </motion.div>
       )}
@@ -429,6 +443,7 @@ function ReadyTable({
   onLeave,
   onRematch,
   apply,
+  sendChat,
 }: {
   state: GameState
   version: number | undefined
@@ -457,6 +472,14 @@ function ReadyTable({
   onLeave: () => void
   onRematch: () => void
   apply: (mutate: (current: GameState) => GameState) => Promise<unknown>
+  sendChat: (
+    body: string,
+    opts?: {
+      kind?: "chat" | "state"
+      playerId?: string
+      playerName?: string
+    }
+  ) => void | Promise<void>
 }) {
   const seated = mySeatIndex !== null
   const showJoin =
@@ -508,9 +531,11 @@ function ReadyTable({
     }
     if (isBridge(state) && "net" in lastRound) {
       const play = playFromHistory(state.history)
+      const we = mySeatIndex !== null ? sideForSeat(mySeatIndex) : "NS"
+      const they = we === "NS" ? "EW" : "NS"
       return [
-        { seat: 0, name: "NS", score: sidePoints(play, "NS") },
-        { seat: 1, name: "EW", score: sidePoints(play, "EW") },
+        { seat: 0, name: "We", score: sidePoints(play, we) },
+        { seat: 1, name: "They", score: sidePoints(play, they) },
       ]
     }
     return []
@@ -539,9 +564,40 @@ function ReadyTable({
     state,
     onRematch,
   })
+  const announceBridgeCall = useCallback(
+    (
+      seat: { playerId: string | null; displayName: string | null; index: number },
+      call: BridgeCall,
+      auction: BridgeCall[]
+    ) => {
+      void sendChat(formatBidChat(call, auction), {
+        kind: "state",
+        playerId: seat.playerId ?? `bot:${seat.index}`,
+        playerName: seat.displayName ?? "Bot",
+      })
+    },
+    [sendChat]
+  )
+
+  const announceOhHellBid = useCallback(
+    (
+      seat: { playerId: string | null; displayName: string | null; index: number },
+      bid: number
+    ) => {
+      void sendChat(`Bid ${bid}`, {
+        kind: "state",
+        playerId: seat.playerId ?? `bot:${seat.index}`,
+        playerName: seat.displayName ?? "Bot",
+      })
+    },
+    [sendChat]
+  )
+
   useBotController(state, version, mySeatIndex, apply, {
     playerId,
     onlineIds: online,
+    onBridgeCall: announceBridgeCall,
+    onOhHellBid: announceOhHellBid,
   })
 
   return (

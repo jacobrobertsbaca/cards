@@ -37,7 +37,11 @@ function readMessages(code: string): ChatMessage[] {
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw) as ChatMessage[]
-    return Array.isArray(parsed) ? parsed : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((message) => ({
+      ...message,
+      kind: message.kind === "state" ? "state" : "chat",
+    }))
   } catch {
     return []
   }
@@ -90,6 +94,7 @@ export function createLocalStore(): GameStore {
         playerId: draft.playerId,
         playerName: draft.playerName,
         body: draft.body,
+        kind: draft.kind ?? "chat",
         createdAt: new Date().toISOString(),
       }
       const next = [...readMessages(code), message]
