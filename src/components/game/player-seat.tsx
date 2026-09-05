@@ -288,7 +288,9 @@ export function PlayerSeat({
                     } as CSSProperties
                   }
                 >
-                  <EmoteIcon emote={item.emote} />
+                  <span className="emote-char" data-emote={item.emote}>
+                    <EmoteIcon emote={item.emote} animated />
+                  </span>
                 </span>
               );
             })}
